@@ -2,6 +2,7 @@
 
 ## 0.4.1 - 2026-05-04
 
+- Sort repository activity events by timestamp so repo submenus do not show stale activity when GitHub returns events out of order.
 - Add a menu bar GitHub rate-limit meter and a detailed GitHub Rate Limits menu with grouped resource buckets, progress bars, reset times, and GraphQL/API bucket data from GitHub's `/rate_limit` endpoint.
 - Move GitHub rate-limit status above the repository filter bar, expose it from the profile submenu, and keep the menu bar meter, main menu row, CLI, and debug output on the same refreshed snapshot.
 - Widen and streamline the Repositories settings browser with cached row filtering, lighter visibility controls, and corrected issue/pull request counts when GitHub's `open_issues_count` includes pull requests.
