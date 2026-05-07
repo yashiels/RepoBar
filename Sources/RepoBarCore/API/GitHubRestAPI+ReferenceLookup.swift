@@ -37,6 +37,17 @@ extension GitHubRestAPI {
         return GitHubReferenceMatch.newestCreated(in: matches)
     }
 
+    func liveReferenceMatch(query: GitHubReferenceQuery) async -> GitHubReferenceMatch? {
+        switch query {
+        case .issueNumber, .commitHash:
+            return nil
+        case let .repositoryIssueNumber(repositoryFullName, number):
+            return await self.liveIssueNumberMatch(query: query, number: number, repositoryFullName: repositoryFullName)
+        case let .repositoryCommitHash(repositoryFullName, hash):
+            return await self.liveCommitMatch(query: query, hash: hash, repositoryFullName: repositoryFullName)
+        }
+    }
+
     private func cachedIssueNumberMatches(
         query: GitHubReferenceQuery,
         number: Int,
@@ -133,6 +144,20 @@ extension GitHubRestAPI {
         }
     }
 
+    private func liveIssueNumberMatch(query: GitHubReferenceQuery, number: Int, repositoryFullName: String) async -> GitHubReferenceMatch? {
+        guard let parts = query.repositoryOwnerAndName else { return nil }
+
+        do {
+            let baseURL = await apiHost()
+            let url = baseURL.appending(path: "/repos/\(parts.owner)/\(parts.name)/issues/\(number)")
+            let data = try await self.referenceLookupData(url: url)
+            let response = try GitHubDecoding.decode(IssueLookupResponse.self, from: data)
+            return response.match(query: query, repositoryFullName: repositoryFullName)
+        } catch {
+            return nil
+        }
+    }
+
     private func liveCommitMatch(query: GitHubReferenceQuery, hash: String, repo: Repository) async -> GitHubReferenceMatch? {
         do {
             let token = try await tokenProvider()
@@ -144,6 +169,41 @@ extension GitHubRestAPI {
         } catch {
             return nil
         }
+    }
+
+    private func liveCommitMatch(query: GitHubReferenceQuery, hash: String, repositoryFullName: String) async -> GitHubReferenceMatch? {
+        guard let parts = query.repositoryOwnerAndName else { return nil }
+
+        do {
+            let baseURL = await apiHost()
+            let url = baseURL.appending(path: "/repos/\(parts.owner)/\(parts.name)/commits/\(hash)")
+            let data = try await self.referenceLookupData(url: url)
+            let response = try GitHubDecoding.decode(CommitLookupResponse.self, from: data)
+            return response.match(query: query, repositoryFullName: repositoryFullName)
+        } catch {
+            return nil
+        }
+    }
+
+    private func referenceLookupData(url: URL) async throws -> Data {
+        if let token = try? await tokenProvider(), token.isEmpty == false {
+            return try await authorizedGet(url: url, token: token, useETag: false).0
+        }
+
+        var request = URLRequest(url: url)
+        request.addValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.addValue("RepoBar", forHTTPHeaderField: "User-Agent")
+        let (data, responseAny) = try await URLSession.shared.data(for: request)
+        guard let response = responseAny as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        guard (200 ..< 300).contains(response.statusCode) else {
+            throw GitHubAPIError.badStatus(
+                code: response.statusCode,
+                message: HTTPURLResponse.localizedString(forStatusCode: response.statusCode)
+            )
+        }
+        return data
     }
 
     private func cachedRecentIssueURLs(baseURL: URL, owner: String, name: String) -> [URL] {

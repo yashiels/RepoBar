@@ -157,6 +157,12 @@ struct RepoBarCoreModelsTests {
                 hash: "ffd212ca43abcdef"
             ).displayText == "openclaw/openclaw@ffd212ca43"
         )
+        let scoped = GitHubReferenceQuery.repositoryIssueNumber(
+            repositoryFullName: "openclaw/openclaw",
+            number: 73655
+        )
+        #expect(scoped.repositoryOwnerAndName?.owner == "openclaw")
+        #expect(scoped.repositoryOwnerAndName?.name == "openclaw")
     }
 
     @Test

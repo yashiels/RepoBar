@@ -164,7 +164,7 @@ final class AppState {
             repositories
         }
         guard candidateRepositories.isEmpty == false else {
-            self.setKeyboardIssueMatch(nil)
+            self.setKeyboardIssueMatch(await self.github.liveReferenceMatch(query: query))
             return
         }
 
@@ -182,7 +182,12 @@ final class AppState {
             query: query,
             repositories: Array(candidateRepositories.prefix(AppLimits.IssueNumberMonitor.liveLookupLimit))
         )
-        self.setKeyboardIssueMatch(liveMatch)
+        if let liveMatch {
+            self.setKeyboardIssueMatch(liveMatch)
+            return
+        }
+
+        self.setKeyboardIssueMatch(await self.github.liveReferenceMatch(query: query))
     }
 
     private func githubReferenceCandidateRepositories() -> [Repository] {

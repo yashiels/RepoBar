@@ -103,6 +103,10 @@ public actor GitHubClient {
         await self.restAPI.liveReferenceMatch(query: query, repositories: repositories)
     }
 
+    public func liveReferenceMatch(query: GitHubReferenceQuery) async -> GitHubReferenceMatch? {
+        await self.restAPI.liveReferenceMatch(query: query)
+    }
+
     public func defaultRepositories(limit: Int, for _: String) async throws -> [Repository] {
         let repos = try await self.restAPI.userReposSorted(limit: max(limit, 10))
         await self.repoDetailCoordinator.updateDiscussionsCapability(

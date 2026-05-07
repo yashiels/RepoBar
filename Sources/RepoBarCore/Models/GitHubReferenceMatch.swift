@@ -50,6 +50,16 @@ public enum GitHubReferenceQuery: Sendable, Hashable {
             repositoryFullName
         }
     }
+
+    public var repositoryOwnerAndName: (owner: String, name: String)? {
+        guard let repositoryFullName else { return nil }
+
+        let parts = repositoryFullName.split(separator: "/", maxSplits: 1).map(String.init)
+        guard parts.count == 2, parts[0].isEmpty == false, parts[1].isEmpty == false else {
+            return nil
+        }
+        return (parts[0], parts[1])
+    }
 }
 
 public struct GitHubReferenceMatch: Sendable, Hashable {
