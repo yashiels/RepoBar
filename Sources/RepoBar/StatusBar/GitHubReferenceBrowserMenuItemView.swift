@@ -6,19 +6,23 @@ import WebKit
 final class GitHubReferenceBrowserMenuItemView: NSView {
     private enum Metrics {
         static let width: CGFloat = 740
-        static let height: CGFloat = 680
+        static let minimumHeight: CGFloat = 680
+        static let maximumHeight: CGFloat = 980
+        static let visibleScreenHeightMultiplier: CGFloat = 0.62
     }
 
     private let url: URL
     private let webView: WKWebView?
+    private let preferredSize: NSSize
     private var hasLoaded = false
 
     override var intrinsicContentSize: NSSize {
-        NSSize(width: Metrics.width, height: Metrics.height)
+        self.preferredSize
     }
 
     init(match: GitHubReferenceMatch) {
         self.url = match.url
+        self.preferredSize = Self.preferredSize()
         if Self.shouldCreateWebView {
             let configuration = WKWebViewConfiguration()
             configuration.websiteDataStore = .default()
@@ -27,7 +31,7 @@ final class GitHubReferenceBrowserMenuItemView: NSView {
         } else {
             self.webView = nil
         }
-        super.init(frame: NSRect(origin: .zero, size: NSSize(width: Metrics.width, height: Metrics.height)))
+        super.init(frame: NSRect(origin: .zero, size: self.preferredSize))
         self.configureView()
     }
 
@@ -72,5 +76,12 @@ final class GitHubReferenceBrowserMenuItemView: NSView {
     private static var shouldCreateWebView: Bool {
         ProcessInfo.processInfo.environment["CI"] != "true" &&
             ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
+    }
+
+    private static func preferredSize(screen: NSScreen? = NSScreen.main) -> NSSize {
+        let visibleHeight = screen?.visibleFrame.height ?? Metrics.minimumHeight
+        let desiredHeight = visibleHeight * Metrics.visibleScreenHeightMultiplier
+        let height = min(max(desiredHeight, Metrics.minimumHeight), Metrics.maximumHeight)
+        return NSSize(width: Metrics.width, height: height.rounded(.down))
     }
 }

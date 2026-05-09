@@ -136,8 +136,8 @@ final class AppState {
                 onPasteboardWithoutReference: { [weak self] in
                     await self?.clearGitHubReference()
                 },
-                onReference: { [weak self] query in
-                    await self?.resolveGitHubReference(query)
+                onReferences: { [weak self] queries in
+                    await self?.resolveGitHubReferences(queries)
                 }
             )
         }
@@ -148,12 +148,24 @@ final class AppState {
     private func clearGitHubReference() async {
         guard self.session.settings.gitHubReferenceMonitor.enabled else { return }
 
-        self.setGitHubReferenceMatch(nil)
+        self.setGitHubReferenceMatches([])
     }
 
-    private func resolveGitHubReference(_ query: GitHubReferenceQuery) async {
+    private func resolveGitHubReferences(_ queries: [GitHubReferenceQuery]) async {
         guard self.session.settings.gitHubReferenceMonitor.enabled else { return }
 
+        var matches: [GitHubReferenceMatch] = []
+        var seen: Set<URL> = []
+        for query in queries.prefix(AppLimits.GitHubReferenceMonitor.queryLimit) {
+            guard let match = await self.resolveGitHubReferenceMatch(query) else { continue }
+            guard seen.insert(match.url).inserted else { continue }
+
+            matches.append(match)
+        }
+        self.setGitHubReferenceMatches(matches)
+    }
+
+    private func resolveGitHubReferenceMatch(_ query: GitHubReferenceQuery) async -> GitHubReferenceMatch? {
         let repositories = self.githubReferenceCandidateRepositories()
         let candidateRepositories = if let repositoryFullName = query.repositoryFullName {
             repositories.filter { $0.fullName.caseInsensitiveCompare(repositoryFullName) == .orderedSame }
@@ -161,8 +173,7 @@ final class AppState {
             repositories
         }
         guard candidateRepositories.isEmpty == false else {
-            await self.setGitHubReferenceMatch(self.github.liveReferenceMatch(query: query))
-            return
+            return await self.github.liveReferenceMatch(query: query)
         }
 
         let cachedMatches = await self.github.cachedReferenceMatches(
@@ -171,8 +182,7 @@ final class AppState {
             limit: AppLimits.GitHubReferenceMonitor.cacheLookupLimit
         )
         if let match = GitHubReferenceMatch.newestCreated(in: cachedMatches) {
-            self.setGitHubReferenceMatch(match)
-            return
+            return match
         }
 
         let liveMatch = await self.github.liveReferenceMatch(
@@ -180,11 +190,10 @@ final class AppState {
             repositories: Array(candidateRepositories.prefix(AppLimits.GitHubReferenceMonitor.liveLookupLimit))
         )
         if let liveMatch {
-            self.setGitHubReferenceMatch(liveMatch)
-            return
+            return liveMatch
         }
 
-        await self.setGitHubReferenceMatch(self.github.liveReferenceMatch(query: query))
+        return await self.github.liveReferenceMatch(query: query)
     }
 
     private func githubReferenceCandidateRepositories() -> [Repository] {
@@ -203,9 +212,15 @@ final class AppState {
     }
 
     private func setGitHubReferenceMatch(_ match: GitHubReferenceMatch?) {
-        guard self.session.gitHubReferenceMatch != match else { return }
+        self.setGitHubReferenceMatches(match.map { [$0] } ?? [])
+    }
 
-        self.session.gitHubReferenceMatch = match
+    private func setGitHubReferenceMatches(_ matches: [GitHubReferenceMatch]) {
+        let primaryMatch = GitHubReferenceMatch.newestCreated(in: matches)
+        guard self.session.gitHubReferenceMatches != matches || self.session.gitHubReferenceMatch != primaryMatch else { return }
+
+        self.session.gitHubReferenceMatches = matches
+        self.session.gitHubReferenceMatch = primaryMatch
         NotificationCenter.default.post(name: .gitHubReferenceMatchDidChange, object: nil)
     }
 }

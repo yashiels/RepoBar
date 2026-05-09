@@ -14,7 +14,7 @@ struct ReferenceTranslateCommand: CommanderRunnableCommand {
     static var commandDescription: CommandDescription {
         CommandDescription(
             commandName: commandName,
-            abstract: "Translate copied text into a GitHub reference query"
+            abstract: "Translate copied text into GitHub reference queries"
         )
     }
 
@@ -28,7 +28,7 @@ struct ReferenceTranslateCommand: CommanderRunnableCommand {
             throw ValidationError("Missing reference text")
         }
 
-        let result = ReferenceTranslationOutput(input: text, query: GitHubReferenceTranslator.query(from: text))
+        let result = ReferenceTranslationOutput(input: text, queries: GitHubReferenceTranslator.queries(from: text))
         if self.output.jsonOutput {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -55,10 +55,32 @@ struct ReferenceTranslateCommand: CommanderRunnableCommand {
         if let hash = result.hash {
             print("hash: \(hash)")
         }
+        if result.matches.count > 1 {
+            print("matches: \(result.matches.count)")
+            for match in result.matches {
+                print("- \(match.displayText)")
+            }
+        }
     }
 }
 
 struct ReferenceTranslationOutput: Codable, Equatable {
+    struct Match: Codable, Equatable {
+        let query: String
+        let displayText: String
+        let repositoryFullName: String?
+        let number: Int?
+        let hash: String?
+
+        init(query: GitHubReferenceQuery) {
+            self.query = ReferenceTranslationOutput.queryName(query)
+            self.displayText = query.displayText
+            self.repositoryFullName = query.repositoryFullName
+            self.number = ReferenceTranslationOutput.number(query)
+            self.hash = ReferenceTranslationOutput.hash(query)
+        }
+    }
+
     let input: String
     let matched: Bool
     let query: String?
@@ -66,15 +88,22 @@ struct ReferenceTranslationOutput: Codable, Equatable {
     let repositoryFullName: String?
     let number: Int?
     let hash: String?
+    let matches: [Match]
 
     init(input: String, query: GitHubReferenceQuery?) {
+        self.init(input: input, queries: query.map { [$0] } ?? [])
+    }
+
+    init(input: String, queries: [GitHubReferenceQuery]) {
         self.input = input
-        self.matched = query != nil
-        self.query = query.map(Self.queryName)
-        self.displayText = query?.displayText
-        self.repositoryFullName = query?.repositoryFullName
-        self.number = query.flatMap(Self.number)
-        self.hash = query.flatMap(Self.hash)
+        let primaryQuery = queries.first
+        self.matched = primaryQuery != nil
+        self.query = primaryQuery.map(Self.queryName)
+        self.displayText = primaryQuery?.displayText
+        self.repositoryFullName = primaryQuery?.repositoryFullName
+        self.number = primaryQuery.flatMap(Self.number)
+        self.hash = primaryQuery.flatMap(Self.hash)
+        self.matches = queries.map(Match.init)
     }
 
     private static func queryName(_ query: GitHubReferenceQuery) -> String {

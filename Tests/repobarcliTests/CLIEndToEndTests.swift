@@ -105,6 +105,34 @@ struct CLIEndToEndTests {
         #expect(decoded.query == "commitHash")
         #expect(decoded.hash == "4992546")
     }
+
+    @Test
+    @MainActor
+    func `reference translate command emits multiple scoped issue matches`() async throws {
+        let output = try await runCLI([
+            "reference-translate",
+            "Found",
+            "5",
+            "more",
+            "in",
+            "openclaw/gogcli",
+            "1.",
+            "#569",
+            "2.",
+            "#568",
+            "3.",
+            "#567",
+            "--json"
+        ])
+        let data = try #require(output.data(using: .utf8))
+        let decoded = try JSONDecoder().decode(ReferenceTranslationOutput.self, from: data)
+        #expect(decoded.matched)
+        #expect(decoded.matches.map(\.displayText) == [
+            "openclaw/gogcli#569",
+            "openclaw/gogcli#568",
+            "openclaw/gogcli#567"
+        ])
+    }
 }
 
 private func fixtureURL(_ name: String) throws -> URL {

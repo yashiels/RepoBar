@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1 - Unreleased
+
+- Let the GitHub reference monitor recognize multiple copied references at once, infer a surrounding `owner/repo` context for bare `#123` items, and group multiple resolved matches into submenus.
+- Grow inline GitHub reference previews on larger displays so more of the issue or pull request is visible in the menu.
+
 ## 0.5.0 - 2026-05-09
 
 - Add an optional Advanced setting for a clipboard-only GitHub reference monitor that surfaces issues, pull requests, and commit hashes from accessible repositories as a separate menu bar item, with cache-first lookup and live GitHub fallback.

@@ -2,15 +2,22 @@ import Foundation
 
 public enum GitHubReferenceTranslator {
     public static let defaultMinimumBareDigits = 1
-    private static let maxScannedTextLength = 600
+    private static let maxScannedTextLength = 8000
 
     public static func query(
         from rawText: String,
         minimumBareDigits: Int = Self.defaultMinimumBareDigits
     ) -> GitHubReferenceQuery? {
+        self.queries(from: rawText, minimumBareDigits: minimumBareDigits).first
+    }
+
+    public static func queries(
+        from rawText: String,
+        minimumBareDigits: Int = Self.defaultMinimumBareDigits
+    ) -> [GitHubReferenceQuery] {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         if let query = self.urlQuery(from: text) {
-            return query
+            return [query]
         }
 
         if let query = self.tokenQuery(
@@ -19,15 +26,24 @@ public enum GitHubReferenceTranslator {
             allowBareIssueNumber: true,
             allowNumericCommitHash: true
         ) {
-            return query
+            return [query]
         }
 
-        guard text.count <= Self.maxScannedTextLength else { return nil }
+        guard text.count <= Self.maxScannedTextLength else { return [] }
 
         let tokens = self.referenceTokens(in: text)
+        let repositoryContext = self.repositoryContext(in: tokens)
+        var queries: [GitHubReferenceQuery] = []
+        var seen: Set<GitHubReferenceQuery> = []
+        func append(_ query: GitHubReferenceQuery) {
+            guard seen.insert(query).inserted else { return }
+
+            queries.append(query)
+        }
+
         for token in tokens {
             if let query = self.urlQuery(from: token) {
-                return query
+                append(query)
             }
         }
 
@@ -39,11 +55,11 @@ public enum GitHubReferenceTranslator {
                 allowBareIssueNumber: false,
                 allowNumericCommitHash: allowsNumericCommitHash
             ) {
-                return query
+                append(self.applyingRepositoryContext(repositoryContext, to: query))
             }
         }
 
-        return nil
+        return queries
     }
 
     private static func tokenQuery(
@@ -146,6 +162,54 @@ public enum GitHubReferenceTranslator {
             part.isEmpty == false && part.allSatisfy { character in
                 character.isLetter || character.isNumber || character == "-" || character == "_" || character == "."
             }
+        }
+    }
+
+    private static func repositoryContext(in tokens: [String]) -> String? {
+        var repositoryFullNames: [String] = []
+        var seen: Set<String> = []
+
+        func append(_ repositoryFullName: String) {
+            guard seen.insert(repositoryFullName.lowercased()).inserted else { return }
+
+            repositoryFullNames.append(repositoryFullName)
+        }
+
+        for (index, token) in tokens.enumerated() {
+            if token.contains("#") == false, self.isRepositoryFullName(token), self.isLikelyRepositoryContextToken(at: index, in: tokens) {
+                append(token)
+                continue
+            }
+            if let repositoryFullName = self.urlQuery(from: token)?.repositoryFullName {
+                append(repositoryFullName)
+                continue
+            }
+            if let repositoryFullName = self.repositoryIssueNumber(from: token)?.repositoryFullName {
+                append(repositoryFullName)
+            }
+        }
+
+        return repositoryFullNames.count == 1 ? repositoryFullNames[0] : nil
+    }
+
+    private static func isLikelyRepositoryContextToken(at index: Int, in tokens: [String]) -> Bool {
+        guard tokens.indices.contains(index) else { return false }
+        guard index > 0 else { return true }
+
+        let previous = tokens[index - 1]
+        return ["in", "repo", "repository", "from", "for", "on", "inside"].contains(previous)
+    }
+
+    private static func applyingRepositoryContext(_ repositoryFullName: String?, to query: GitHubReferenceQuery) -> GitHubReferenceQuery {
+        guard let repositoryFullName else { return query }
+
+        switch query {
+        case let .issueNumber(number):
+            return .repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number)
+        case let .commitHash(hash):
+            return .repositoryCommitHash(repositoryFullName: repositoryFullName, hash: hash)
+        case .repositoryIssueNumber, .repositoryCommitHash:
+            return query
         }
     }
 

@@ -51,7 +51,7 @@ final class StatusBarMenuManager: NSObject, NSMenuDelegate {
     private var lastMainMenuWidthSignature: MenuBuildSignature?
     private var pendingMenuReopen = false
     private var gitHubReferenceSyncTask: Task<Void, Never>?
-    private var gitHubReferenceMenuMatch: GitHubReferenceMatch?
+    private var gitHubReferenceMenuMatches: [GitHubReferenceMatch] = []
     var webURLBuilder: RepoWebURLBuilder {
         RepoWebURLBuilder(host: self.appState.session.settings.githubHost)
     }
@@ -227,24 +227,28 @@ final class StatusBarMenuManager: NSObject, NSMenuDelegate {
     }
 
     private func syncGitHubReferenceStatusItem() {
-        guard let match = self.appState.session.gitHubReferenceMatch else {
+        let matches = self.appState.session.gitHubReferenceMatches
+        guard self.appState.session.gitHubReferenceMatch != nil, matches.isEmpty == false else {
             self.hideGitHubReferenceStatusItem()
             return
         }
 
         let item = self.lazyGitHubReferenceStatusItem()
         let menu = self.lazyGitHubReferenceMenu()
-        self.populateGitHubReferenceMenu(menu, match: match)
+        self.populateGitHubReferenceMenu(menu, matches: matches)
         item.length = NSStatusItem.variableLength
         if let button = item.button {
             button.isHidden = false
             button.isEnabled = true
-            button.image = NSImage(systemSymbolName: self.gitHubReferenceSystemImage(for: match), accessibilityDescription: match.kind.label)
+            button.image = NSImage(
+                systemSymbolName: self.gitHubReferenceSystemImage(for: matches),
+                accessibilityDescription: self.gitHubReferenceAccessibilityDescription(for: matches)
+            )
             button.image?.isTemplate = true
             button.imageScaling = .scaleNone
             (button.cell as? NSButtonCell)?.lineBreakMode = .byTruncatingTail
-            self.setButtonTitle(self.gitHubReferenceTitle(for: match), for: button)
-            button.toolTip = self.gitHubReferenceMenuTitle(for: match)
+            self.setButtonTitle(self.gitHubReferenceTitle(for: matches), for: button)
+            button.toolTip = self.gitHubReferenceMenuTitle(for: matches)
             button.target = nil
             button.action = nil
             self.clampGitHubReferenceStatusItemLength(item, button: button)
@@ -258,7 +262,7 @@ final class StatusBarMenuManager: NSObject, NSMenuDelegate {
         guard let item = self.gitHubReferenceStatusItem else { return }
 
         self.gitHubReferenceMenu = nil
-        self.gitHubReferenceMenuMatch = nil
+        self.gitHubReferenceMenuMatches = []
         self.collapseGitHubReferenceStatusItem(item)
         self.auditStatusItems("hideGitHubReferenceStatusItem")
     }
@@ -295,7 +299,7 @@ final class StatusBarMenuManager: NSObject, NSMenuDelegate {
 
     private func removeGitHubReferenceStatusItem() {
         self.gitHubReferenceMenu = nil
-        self.gitHubReferenceMenuMatch = nil
+        self.gitHubReferenceMenuMatches = []
         guard let item = self.gitHubReferenceStatusItem else { return }
 
         self.collapseGitHubReferenceStatusItem(item)
@@ -748,12 +752,31 @@ final class StatusBarMenuManager: NSObject, NSMenuDelegate {
 }
 
 private extension StatusBarMenuManager {
-    func populateGitHubReferenceMenu(_ menu: NSMenu, match: GitHubReferenceMatch) {
-        guard self.gitHubReferenceMenuMatch != match else { return }
+    func populateGitHubReferenceMenu(_ menu: NSMenu, matches: [GitHubReferenceMatch]) {
+        guard self.gitHubReferenceMenuMatches != matches else { return }
 
         menu.removeAllItems()
-        self.gitHubReferenceMenuMatch = match
+        self.gitHubReferenceMenuMatches = matches
 
+        if matches.count == 1, let match = matches.first {
+            self.addGitHubReferenceItems(to: menu, match: match, includeBrowserPreview: true)
+            return
+        }
+
+        for match in matches {
+            let item = NSMenuItem(title: self.gitHubReferenceTitle(for: match), action: nil, keyEquivalent: "")
+            item.image = NSImage(systemSymbolName: self.gitHubReferenceSystemImage(for: match), accessibilityDescription: match.kind.label)
+            item.image?.isTemplate = true
+
+            let submenu = NSMenu()
+            submenu.autoenablesItems = false
+            self.addGitHubReferenceItems(to: submenu, match: match, includeBrowserPreview: true)
+            item.submenu = submenu
+            menu.addItem(item)
+        }
+    }
+
+    func addGitHubReferenceItems(to menu: NSMenu, match: GitHubReferenceMatch, includeBrowserPreview: Bool) {
         let openTitle = "Open \(match.query.displayText) in Browser"
         let openItem = NSMenuItem(title: openTitle, action: #selector(self.openGitHubReferenceMatch(_:)), keyEquivalent: "")
         openItem.target = self
@@ -769,11 +792,12 @@ private extension StatusBarMenuManager {
         copyItem.image?.isTemplate = true
         menu.addItem(copyItem)
 
-        menu.addItem(.separator())
+        guard includeBrowserPreview else { return }
 
+        menu.addItem(.separator())
         let browserItem = NSMenuItem()
         let browserView = GitHubReferenceBrowserMenuItemView(match: match)
-        if self.shouldPreloadGitHubReferenceBrowserPreview {
+        if self.shouldPreloadGitHubReferenceBrowserPreview, self.appState.session.gitHubReferenceMatches.count <= 1 {
             browserView.preload()
         }
         browserItem.view = browserView
@@ -787,14 +811,24 @@ private extension StatusBarMenuManager {
         return "\(state)\(kind): \(match.title)"
     }
 
+    func gitHubReferenceMenuTitle(for matches: [GitHubReferenceMatch]) -> String {
+        if matches.count == 1, let match = matches.first {
+            return self.gitHubReferenceMenuTitle(for: match)
+        }
+        if let repo = self.commonRepositoryFullName(in: matches) {
+            return "\(matches.count) GitHub references in \(repo)"
+        }
+        return "\(matches.count) GitHub references"
+    }
+
     func refreshGitHubReferenceMenuIfNeeded(_ menu: NSMenu) {
         guard menu === self.gitHubReferenceMenu,
-              let match = self.appState.session.gitHubReferenceMatch
+              self.appState.session.gitHubReferenceMatches.isEmpty == false
         else {
             return
         }
 
-        self.populateGitHubReferenceMenu(menu, match: match)
+        self.populateGitHubReferenceMenu(menu, matches: self.appState.session.gitHubReferenceMatches)
     }
 
     var shouldPreloadGitHubReferenceBrowserPreview: Bool {
@@ -819,6 +853,35 @@ private extension StatusBarMenuManager {
         }
     }
 
+    func gitHubReferenceSystemImage(for matches: [GitHubReferenceMatch]) -> String {
+        guard matches.count != 1, let first = matches.first else {
+            return matches.first.map(self.gitHubReferenceSystemImage(for:)) ?? "number.square"
+        }
+
+        if matches.allSatisfy({ $0.kind == first.kind }) {
+            return self.gitHubReferenceSystemImage(for: first)
+        }
+        return "list.bullet.rectangle"
+    }
+
+    func gitHubReferenceAccessibilityDescription(for matches: [GitHubReferenceMatch]) -> String {
+        if matches.count == 1, let match = matches.first {
+            return match.kind.label
+        }
+        return "\(matches.count) GitHub References"
+    }
+
+    func gitHubReferenceTitle(for matches: [GitHubReferenceMatch]) -> String {
+        guard matches.count != 1 else {
+            return matches.first.map(self.gitHubReferenceTitle(for:)) ?? ""
+        }
+
+        let repoSuffix = self.commonRepositoryFullName(in: matches)
+            .map { " " + Self.truncatedMiddle($0, maxCharacters: Self.gitHubReferenceRepositoryTitleLimit) }
+            ?? ""
+        return "\(matches.count) GitHub refs\(repoSuffix)"
+    }
+
     func gitHubReferenceTitle(for match: GitHubReferenceMatch) -> String {
         var parts = [self.gitHubReferenceText(for: match)]
         if let state = match.state?.label {
@@ -839,6 +902,12 @@ private extension StatusBarMenuManager {
              let .repositoryCommitHash(_, hash):
             String(hash.prefix(10))
         }
+    }
+
+    func commonRepositoryFullName(in matches: [GitHubReferenceMatch]) -> String? {
+        guard let first = matches.first?.repositoryFullName else { return nil }
+
+        return matches.allSatisfy { $0.repositoryFullName.caseInsensitiveCompare(first) == .orderedSame } ? first : nil
     }
 
     func clampGitHubReferenceStatusItemLength(_ item: NSStatusItem, button: NSStatusBarButton) {

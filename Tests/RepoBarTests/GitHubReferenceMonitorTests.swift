@@ -81,4 +81,57 @@ struct GitHubReferenceMonitorTests {
                 .repositoryCommitHash(repositoryFullName: "openclaw/openclaw", hash: "d04517cefff3af339f560a8e388cacc3898e6562")
         )
     }
+
+    @Test
+    func `multiple bare issue references inherit repository context`() {
+        let text = """
+        Found 5 more in openclaw/gogcli after clean main pull.
+
+        1. #569 release/bottle codesigning
+        2. #568 local self-sign PR
+        3. #567 Win11 access_denied
+        4. #338 Workspace invalid_rapt
+        5. #468 Google Meet PR
+        """
+        #expect(
+            GitHubReferenceTranslator.queries(from: text) == [
+                .repositoryIssueNumber(repositoryFullName: "openclaw/gogcli", number: 569),
+                .repositoryIssueNumber(repositoryFullName: "openclaw/gogcli", number: 568),
+                .repositoryIssueNumber(repositoryFullName: "openclaw/gogcli", number: 567),
+                .repositoryIssueNumber(repositoryFullName: "openclaw/gogcli", number: 338),
+                .repositoryIssueNumber(repositoryFullName: "openclaw/gogcli", number: 468)
+            ]
+        )
+    }
+
+    @Test
+    func `multiple parser ignores slash words that are not repository context`() {
+        let text = """
+        Found items in openclaw/gogcli.
+
+        1. #569 release/bottle codesigning
+        2. #568 local self-sign PR
+        """
+        #expect(GitHubReferenceTranslator.queries(from: text) == [
+            .repositoryIssueNumber(repositoryFullName: "openclaw/gogcli", number: 569),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/gogcli", number: 568)
+        ])
+    }
+
+    @Test
+    func `multiple parser ignores ordered list numbers`() {
+        let text = """
+        1. #10 first
+        2. #11 second
+        """
+        #expect(GitHubReferenceTranslator.queries(from: text) == [.issueNumber(10), .issueNumber(11)])
+    }
+
+    @Test
+    func `multiple parser dedupes references after inheriting scoped context`() {
+        let text = "openclaw/gogcli#569 #569 https://github.com/openclaw/gogcli/issues/569"
+        #expect(GitHubReferenceTranslator.queries(from: text) == [
+            .repositoryIssueNumber(repositoryFullName: "openclaw/gogcli", number: 569)
+        ])
+    }
 }

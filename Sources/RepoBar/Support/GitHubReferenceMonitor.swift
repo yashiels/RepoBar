@@ -6,7 +6,7 @@ final class GitHubReferenceMonitor {
     private let minimumBareDigits: Int
     private let pasteboard: NSPasteboard
     private let onPasteboardWithoutReference: () async -> Void
-    private let onReference: (GitHubReferenceQuery) async -> Void
+    private let onReferences: ([GitHubReferenceQuery]) async -> Void
     private var pasteboardPoller: PasteboardTextPoller?
     private var isRunning = false
 
@@ -14,12 +14,12 @@ final class GitHubReferenceMonitor {
         minimumBareDigits: Int = AppLimits.GitHubReferenceMonitor.minimumBareDigits,
         pasteboard: NSPasteboard = .general,
         onPasteboardWithoutReference: @escaping () async -> Void = {},
-        onReference: @escaping (GitHubReferenceQuery) async -> Void
+        onReferences: @escaping ([GitHubReferenceQuery]) async -> Void
     ) {
         self.minimumBareDigits = minimumBareDigits
         self.pasteboard = pasteboard
         self.onPasteboardWithoutReference = onPasteboardWithoutReference
-        self.onReference = onReference
+        self.onReferences = onReferences
     }
 
     func start() {
@@ -48,16 +48,21 @@ final class GitHubReferenceMonitor {
     }
 
     private func handlePasteboardText(_ text: String) {
-        guard let query = Self.query(from: text, minimumBareDigits: self.minimumBareDigits) else {
+        let queries = Self.queries(from: text, minimumBareDigits: self.minimumBareDigits)
+        guard queries.isEmpty == false else {
             Task { await self.onPasteboardWithoutReference() }
             return
         }
 
-        Task { await self.onReference(query) }
+        Task { await self.onReferences(queries) }
     }
 
     static func query(from rawText: String, minimumBareDigits: Int = AppLimits.GitHubReferenceMonitor.minimumBareDigits) -> GitHubReferenceQuery? {
         GitHubReferenceTranslator.query(from: rawText, minimumBareDigits: minimumBareDigits)
+    }
+
+    static func queries(from rawText: String, minimumBareDigits: Int = AppLimits.GitHubReferenceMonitor.minimumBareDigits) -> [GitHubReferenceQuery] {
+        GitHubReferenceTranslator.queries(from: rawText, minimumBareDigits: minimumBareDigits)
     }
 }
 
