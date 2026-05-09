@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.2 - 2026-05-06
+## 0.5.0 - 2026-05-09
 
 - Add an optional Advanced setting for a clipboard-only GitHub reference monitor that surfaces issues, pull requests, and commit hashes from accessible repositories as a separate menu bar item, with cache-first lookup and live GitHub fallback.
 - Show per-endpoint GitHub cooldowns in the Rate Limits sidebar and diagnostics so commit-activity backoff is distinct from healthy REST/GraphQL quota buckets.
