@@ -10,4 +10,4 @@ mkdir -p "${CACHE_PATH}"
 ./Scripts/swiftpm_sanitize.sh
 
 echo "==> swift test"
-swift test -q --cache-path "${CACHE_PATH}"
+swift test -q --cache-path "${CACHE_PATH}" "$@"

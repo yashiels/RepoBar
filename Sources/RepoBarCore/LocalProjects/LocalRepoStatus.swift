@@ -227,6 +227,21 @@ public struct LocalRepoIndex: Equatable, Sendable {
         return nil
     }
 
+    public func status(containingPath path: String) -> LocalRepoStatus? {
+        let normalizedPath = URL(fileURLWithPath: PathFormatter.expandTilde(path)).standardizedFileURL.path
+        if let exact = self.byPath[normalizedPath] { return exact }
+
+        let matches = self.all.filter { status in
+            let repoPath = status.path.standardizedFileURL.path
+            return normalizedPath == repoPath || normalizedPath.hasPrefix(repoPath + "/")
+        }
+        guard matches.isEmpty == false else { return nil }
+
+        return matches.reduce(matches[0]) { current, candidate in
+            current.path.path.count >= candidate.path.path.count ? current : candidate
+        }
+    }
+
     private func uniqueStatus(forName name: String) -> LocalRepoStatus? {
         if let exact = self.uniqueStatus(in: self.byName, forKey: name) { return exact }
         return self.uniqueStatus(in: self.byNameLowercased, forKey: name.lowercased())

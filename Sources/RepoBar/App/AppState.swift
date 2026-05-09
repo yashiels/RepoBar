@@ -136,8 +136,8 @@ final class AppState {
                 onPasteboardWithoutReference: { [weak self] in
                     await self?.clearGitHubReference()
                 },
-                onReferences: { [weak self] queries in
-                    await self?.resolveGitHubReferences(queries)
+                onReferences: { [weak self] queries, text in
+                    await self?.resolveGitHubReferences(queries, sourceText: text)
                 }
             )
         }
@@ -151,18 +151,32 @@ final class AppState {
         self.setGitHubReferenceMatches([])
     }
 
-    private func resolveGitHubReferences(_ queries: [GitHubReferenceQuery]) async {
+    private func resolveGitHubReferences(_ queries: [GitHubReferenceQuery], sourceText: String) async {
         guard self.session.settings.gitHubReferenceMonitor.enabled else { return }
 
+        let scopedQueries = await self.queries(queries, applyingLocalRepositoryContextFrom: sourceText)
         var matches: [GitHubReferenceMatch] = []
         var seen: Set<URL> = []
-        for query in queries.prefix(AppLimits.GitHubReferenceMonitor.queryLimit) {
+        for query in scopedQueries.prefix(AppLimits.GitHubReferenceMonitor.queryLimit) {
             guard let match = await self.resolveGitHubReferenceMatch(query) else { continue }
             guard seen.insert(match.url).inserted else { continue }
 
             matches.append(match)
         }
         self.setGitHubReferenceMatches(matches)
+    }
+
+    private func queries(
+        _ queries: [GitHubReferenceQuery],
+        applyingLocalRepositoryContextFrom text: String
+    ) async -> [GitHubReferenceQuery] {
+        guard queries.contains(where: { $0.repositoryFullName == nil }) else { return queries }
+
+        let repositoryFullName = await GitHubReferenceLocalContext.repositoryFullName(
+            in: text,
+            localRepoIndex: self.session.localRepoIndex
+        )
+        return GitHubReferenceLocalContext.queries(queries, applyingRepositoryFullName: repositoryFullName)
     }
 
     private func resolveGitHubReferenceMatch(_ query: GitHubReferenceQuery) async -> GitHubReferenceMatch? {

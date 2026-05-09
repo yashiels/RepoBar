@@ -6,7 +6,7 @@ final class GitHubReferenceMonitor {
     private let minimumBareDigits: Int
     private let pasteboard: NSPasteboard
     private let onPasteboardWithoutReference: () async -> Void
-    private let onReferences: ([GitHubReferenceQuery]) async -> Void
+    private let onReferences: ([GitHubReferenceQuery], String) async -> Void
     private var pasteboardPoller: PasteboardTextPoller?
     private var isRunning = false
 
@@ -14,7 +14,7 @@ final class GitHubReferenceMonitor {
         minimumBareDigits: Int = AppLimits.GitHubReferenceMonitor.minimumBareDigits,
         pasteboard: NSPasteboard = .general,
         onPasteboardWithoutReference: @escaping () async -> Void = {},
-        onReferences: @escaping ([GitHubReferenceQuery]) async -> Void
+        onReferences: @escaping ([GitHubReferenceQuery], String) async -> Void
     ) {
         self.minimumBareDigits = minimumBareDigits
         self.pasteboard = pasteboard
@@ -54,7 +54,7 @@ final class GitHubReferenceMonitor {
             return
         }
 
-        Task { await self.onReferences(queries) }
+        Task { await self.onReferences(queries, text) }
     }
 
     static func query(from rawText: String, minimumBareDigits: Int = AppLimits.GitHubReferenceMonitor.minimumBareDigits) -> GitHubReferenceQuery? {

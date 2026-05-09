@@ -243,6 +243,35 @@ struct LocalProjectsServiceTests {
     }
 
     @Test
+    func `local repo index matches containing paths`() {
+        let root = LocalRepoStatus(
+            path: URL(fileURLWithPath: "/tmp/repo"),
+            name: "repo",
+            fullName: "owner/repo",
+            branch: "main",
+            isClean: true,
+            aheadCount: 0,
+            behindCount: 0,
+            syncState: .synced
+        )
+        let worktree = LocalRepoStatus(
+            path: URL(fileURLWithPath: "/tmp/repo/.work/feature"),
+            name: "repo",
+            fullName: "owner/repo",
+            branch: "feature",
+            isClean: true,
+            aheadCount: 0,
+            behindCount: 0,
+            syncState: .synced,
+            worktreeName: "feature"
+        )
+        let index = LocalRepoIndex(statuses: [root, worktree])
+
+        #expect(index.status(containingPath: "/tmp/repo/Sources/File.swift")?.path.path == root.path.path)
+        #expect(index.status(containingPath: "/tmp/repo/.work/feature/Sources/File.swift")?.path.path == worktree.path.path)
+    }
+
+    @Test
     func `snapshot includes worktree name for worktrees`() async throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }

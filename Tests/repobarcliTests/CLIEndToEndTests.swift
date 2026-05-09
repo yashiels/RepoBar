@@ -4,6 +4,7 @@ import Foundation
 @testable import repobarcli
 import Testing
 
+@Suite(.serialized)
 struct CLIEndToEndTests {
     @Test
     @MainActor
@@ -133,6 +134,38 @@ struct CLIEndToEndTests {
             "openclaw/gogcli#567"
         ])
     }
+
+    @Test
+    @MainActor
+    func `reference translate command infers repo from local git path`() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        try runProcess("git", ["init"], in: tempDir)
+        try runProcess("git", ["remote", "add", "origin", "https://github.com/openclaw/crabbox.git"], in: tempDir)
+
+        let copiedText = """
+        issues: none
+          - PRs:
+              - #61 feat: add checkpoint ledger store
+              - #60 docs: sharpen agent workspace positioning
+
+        gpt-5.5 high fast · \(tempDir.path) · -
+        """
+        let output = try await runCLI([
+            "reference-translate",
+            copiedText,
+            "--json"
+        ])
+        let data = try #require(output.data(using: .utf8))
+        let decoded = try JSONDecoder().decode(ReferenceTranslationOutput.self, from: data)
+        #expect(decoded.matched)
+        #expect(decoded.matches.map(\.displayText) == [
+            "openclaw/crabbox#61",
+            "openclaw/crabbox#60"
+        ])
+    }
 }
 
 private func fixtureURL(_ name: String) throws -> URL {
@@ -145,6 +178,24 @@ private func fixtureURL(_ name: String) throws -> URL {
 
 private enum FixtureError: Error {
     case missing(String)
+}
+
+private func runProcess(_ executable: String, _ arguments: [String], in directory: URL) throws {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = [executable] + arguments
+    process.currentDirectoryURL = directory
+    process.standardOutput = Pipe()
+    process.standardError = Pipe()
+    try process.run()
+    process.waitUntilExit()
+    guard process.terminationStatus == 0 else {
+        throw ProcessError.failed(executable: executable, arguments: arguments)
+    }
+}
+
+private enum ProcessError: Error {
+    case failed(executable: String, arguments: [String])
 }
 
 @MainActor

@@ -3,6 +3,7 @@
 ## 0.5.1 - Unreleased
 
 - Let the GitHub reference monitor recognize multiple copied references at once, infer a surrounding `owner/repo` context for bare `#123` items, and group multiple resolved matches into submenus.
+- Infer the GitHub repository for bare references from copied local git paths like `~/Projects/crabbox`.
 - Grow inline GitHub reference previews on larger displays so more of the issue or pull request is visible in the menu.
 
 ## 0.5.0 - 2026-05-09

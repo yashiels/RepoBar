@@ -1,3 +1,4 @@
+import Foundation
 @testable import RepoBarCore
 import Testing
 
@@ -133,5 +134,57 @@ struct GitHubReferenceMonitorTests {
         #expect(GitHubReferenceTranslator.queries(from: text) == [
             .repositoryIssueNumber(repositoryFullName: "openclaw/gogcli", number: 569)
         ])
+    }
+
+    @Test
+    func `local path candidates trim prompt separators`() {
+        let text = "gpt-5.5 high fast · ~/Projects/crabbox · -"
+        #expect(GitHubReferenceLocalContext.localPathCandidates(in: text) == ["~/Projects/crabbox"])
+    }
+
+    @Test
+    func `remote urls become github repository full names`() {
+        #expect(
+            GitHubReferenceLocalContext.gitHubRepositoryFullName(
+                fromRemoteURL: "https://github.com/openclaw/crabbox.git"
+            ) == "openclaw/crabbox"
+        )
+        #expect(
+            GitHubReferenceLocalContext.gitHubRepositoryFullName(
+                fromRemoteURL: "git@github.com:openclaw/crabbox.git"
+            ) == "openclaw/crabbox"
+        )
+    }
+
+    @Test
+    func `bare references inherit local repository context`() async {
+        let status = LocalRepoStatus(
+            path: URL(fileURLWithPath: "/tmp/crabbox"),
+            name: "crabbox",
+            fullName: "openclaw/crabbox",
+            branch: "main",
+            isClean: true,
+            aheadCount: 0,
+            behindCount: 0,
+            syncState: .synced
+        )
+        let index = LocalRepoIndex(statuses: [status])
+        let text = """
+        - PRs:
+            - #61 feat: add checkpoint ledger store
+            - #60 docs: sharpen agent workspace positioning
+
+        gpt-5.5 high fast · /tmp/crabbox · -
+        """
+        let repositoryFullName = await GitHubReferenceLocalContext.repositoryFullName(in: text, localRepoIndex: index)
+        let queries: [GitHubReferenceQuery] = GitHubReferenceLocalContext.queries(
+            GitHubReferenceTranslator.queries(from: text),
+            applyingRepositoryFullName: repositoryFullName
+        )
+        let expected: [GitHubReferenceQuery] = [
+            .repositoryIssueNumber(repositoryFullName: "openclaw/crabbox", number: 61),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/crabbox", number: 60)
+        ]
+        #expect(queries == expected)
     }
 }
