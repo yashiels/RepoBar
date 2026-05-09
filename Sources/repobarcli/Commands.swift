@@ -49,6 +49,7 @@ struct RepoBarRoot: ParsableCommand {
                 ArchivesEnableCommand.self,
                 ArchivesDisableCommand.self,
                 RateLimitsCommand.self,
+                ReferenceTranslateCommand.self,
                 CacheStatusCommand.self,
                 CacheClearCommand.self,
                 SettingsShowCommand.self,

@@ -40,6 +40,7 @@ enum HelpTarget: String {
     case archivesEnable
     case archivesDisable
     case rateLimits
+    case referenceTranslate
     case cacheStatus
     case cacheClear
     case settingsShow
@@ -143,6 +144,8 @@ enum HelpTarget: String {
             return .archivesDisable
         case RateLimitsCommand.commandName:
             return .rateLimits
+        case ReferenceTranslateCommand.commandName:
+            return .referenceTranslate
         case CacheStatusCommand.commandName:
             return .cacheStatus
         case CacheClearCommand.commandName:
@@ -211,6 +214,7 @@ func printHelp(_ target: HelpTarget) {
           repobar archives enable <name> [--json] [--plain]
           repobar archives disable <name> [--json] [--plain]
           repobar rate-limits [--limit N] [--json] [--plain]
+          repobar reference-translate <text> [--json] [--plain]
           repobar cache status [--limit N] [--json] [--plain]
           repobar cache clear [--json] [--plain]
           repobar settings show [--json] [--plain]
@@ -570,6 +574,18 @@ func printHelp(_ target: HelpTarget) {
           --width N   Wrap at N columns (defaults to terminal width)
           --no-wrap   Disable line wrapping
           --plain     Plain output (strip ANSI styles)
+          --no-color  Disable color output
+        """
+    case .referenceTranslate:
+        """
+        repobar reference-translate - translate copied text into a GitHub reference query
+
+        Usage:
+          repobar reference-translate <text> [--json] [--plain]
+
+        Options:
+          --json      Output JSON instead of formatted text
+          --plain     Plain output
           --no-color  Disable color output
         """
     case .pin:

@@ -57,88 +57,8 @@ final class GitHubReferenceMonitor {
     }
 
     static func query(from rawText: String, minimumBareDigits: Int = AppLimits.GitHubReferenceMonitor.minimumBareDigits) -> GitHubReferenceQuery? {
-        if let query = self.urlQuery(from: rawText) {
-            return query
-        }
-
-        return self.tokenQuery(from: rawText, minimumBareDigits: minimumBareDigits)
+        GitHubReferenceTranslator.query(from: rawText, minimumBareDigits: minimumBareDigits)
     }
-
-    private static func tokenQuery(from rawToken: String, minimumBareDigits: Int) -> GitHubReferenceQuery? {
-        let token = rawToken.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard token.isEmpty == false else { return nil }
-
-        if let number = self.issueNumber(from: token, minimumBareDigits: minimumBareDigits) {
-            return .issueNumber(number)
-        }
-        if self.isCommitHash(token) {
-            return .commitHash(token)
-        }
-        return nil
-    }
-
-    private static func urlQuery(from rawText: String) -> GitHubReferenceQuery? {
-        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: text),
-              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              components.scheme?.lowercased().hasPrefix("http") == true
-        else { return nil }
-
-        let host = components.host?.lowercased() ?? ""
-        guard host == "github.com" || host.hasSuffix(".github.com") else { return nil }
-
-        let pathParts = components.path
-            .split(separator: "/")
-            .map(String.init)
-        guard pathParts.count >= 4 else { return nil }
-
-        let repositoryFullName = "\(pathParts[0])/\(pathParts[1])"
-        if let hash = self.commitHash(in: pathParts.dropFirst(2)) {
-            return .repositoryCommitHash(repositoryFullName: repositoryFullName, hash: hash)
-        }
-
-        switch pathParts[2].lowercased() {
-        case "issues", "pull":
-            guard let number = Int(pathParts[3]) else { return nil }
-
-            return .repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number)
-        case "commit", "commits":
-            let hash = pathParts[3].lowercased()
-            guard self.isCommitHash(hash) else { return nil }
-
-            return .repositoryCommitHash(repositoryFullName: repositoryFullName, hash: hash)
-        default:
-            return nil
-        }
-    }
-
-    private static func commitHash<S: Sequence>(in pathParts: S) -> String? where S.Element == String {
-        pathParts
-            .map { $0.lowercased() }
-            .first(where: self.isCommitHash)
-    }
-
-    private static func issueNumber(from token: String, minimumBareDigits: Int) -> Int? {
-        if token.hasPrefix("#") {
-            return Int(token.dropFirst())
-        }
-        if token.hasPrefix("gh-") {
-            return Int(token.dropFirst(3))
-        }
-        guard token.count >= minimumBareDigits,
-              token.allSatisfy(\.isNumber)
-        else { return nil }
-
-        return Int(token)
-    }
-
-    private static func isCommitHash(_ token: String) -> Bool {
-        guard (7 ... 40).contains(token.count) else { return false }
-        guard token.allSatisfy(\.isHexDigit) else { return false }
-
-        return token.contains { ("a" ... "f").contains($0) }
-    }
-
 }
 
 private final class PasteboardTextPoller: @unchecked Sendable {

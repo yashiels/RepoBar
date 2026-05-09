@@ -70,6 +70,41 @@ struct CLIEndToEndTests {
         #expect(decoded.presentation?.title == "Changelog • Unreleased")
         #expect(decoded.presentation?.badgeText == "1")
     }
+
+    @Test
+    @MainActor
+    func `reference translate command parses copied issue shorthand`() async throws {
+        let output = try await runCLI([
+            "reference-translate",
+            "  - scoped issue shorthand: openclaw/clawsweeper#57",
+            "--json"
+        ])
+        let data = try #require(output.data(using: .utf8))
+        let decoded = try JSONDecoder().decode(ReferenceTranslationOutput.self, from: data)
+        #expect(decoded.matched)
+        #expect(decoded.query == "repositoryIssueNumber")
+        #expect(decoded.repositoryFullName == "openclaw/clawsweeper")
+        #expect(decoded.number == 57)
+    }
+
+    @Test
+    @MainActor
+    func `reference translate command parses copied short sha`() async throws {
+        let output = try await runCLI([
+            "reference-translate",
+            "-",
+            "bare",
+            "short",
+            "SHA:",
+            "4992546",
+            "--json"
+        ])
+        let data = try #require(output.data(using: .utf8))
+        let decoded = try JSONDecoder().decode(ReferenceTranslationOutput.self, from: data)
+        #expect(decoded.matched)
+        #expect(decoded.query == "commitHash")
+        #expect(decoded.hash == "4992546")
+    }
 }
 
 private func fixtureURL(_ name: String) throws -> URL {

@@ -1,0 +1,179 @@
+import Foundation
+
+public enum GitHubReferenceTranslator {
+    public static let defaultMinimumBareDigits = 1
+    private static let maxScannedTextLength = 600
+
+    public static func query(
+        from rawText: String,
+        minimumBareDigits: Int = Self.defaultMinimumBareDigits
+    ) -> GitHubReferenceQuery? {
+        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let query = self.urlQuery(from: text) {
+            return query
+        }
+
+        if let query = self.tokenQuery(
+            from: text,
+            minimumBareDigits: minimumBareDigits,
+            allowBareIssueNumber: true,
+            allowNumericCommitHash: true
+        ) {
+            return query
+        }
+
+        guard text.count <= Self.maxScannedTextLength else { return nil }
+
+        let tokens = self.referenceTokens(in: text)
+        for token in tokens {
+            if let query = self.urlQuery(from: token) {
+                return query
+            }
+        }
+
+        let allowsNumericCommitHash = self.hasCommitContext(text)
+        for token in tokens {
+            if let query = self.tokenQuery(
+                from: token,
+                minimumBareDigits: minimumBareDigits,
+                allowBareIssueNumber: false,
+                allowNumericCommitHash: allowsNumericCommitHash
+            ) {
+                return query
+            }
+        }
+
+        return nil
+    }
+
+    private static func tokenQuery(
+        from rawToken: String,
+        minimumBareDigits: Int,
+        allowBareIssueNumber: Bool,
+        allowNumericCommitHash: Bool
+    ) -> GitHubReferenceQuery? {
+        let token = self.normalizedToken(from: rawToken)
+        guard token.isEmpty == false else { return nil }
+
+        if let scopedIssue = self.repositoryIssueNumber(from: token) {
+            return scopedIssue
+        }
+        if self.isCommitHash(token, allowNumericOnly: allowNumericCommitHash) {
+            return .commitHash(token)
+        }
+        if let number = self.issueNumber(from: token, minimumBareDigits: minimumBareDigits, allowBareNumber: allowBareIssueNumber) {
+            return .issueNumber(number)
+        }
+        return nil
+    }
+
+    private static func urlQuery(from rawText: String) -> GitHubReferenceQuery? {
+        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: text),
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.scheme?.lowercased().hasPrefix("http") == true
+        else { return nil }
+
+        let host = components.host?.lowercased() ?? ""
+        guard host == "github.com" || host.hasSuffix(".github.com") else { return nil }
+
+        let pathParts = components.path
+            .split(separator: "/")
+            .map(String.init)
+        guard pathParts.count >= 4 else { return nil }
+
+        let repositoryFullName = "\(pathParts[0])/\(pathParts[1])"
+        switch pathParts[2].lowercased() {
+        case "issues":
+            guard let number = Int(pathParts[3]) else { return nil }
+
+            return .repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number)
+        case "pull":
+            if let hash = self.commitHash(in: pathParts.dropFirst(4)) {
+                return .repositoryCommitHash(repositoryFullName: repositoryFullName, hash: hash)
+            }
+            guard let number = Int(pathParts[3]) else { return nil }
+
+            return .repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number)
+        case "commit", "commits":
+            let hash = pathParts[3].lowercased()
+            guard self.isCommitHash(hash, allowNumericOnly: true) else { return nil }
+
+            return .repositoryCommitHash(repositoryFullName: repositoryFullName, hash: hash)
+        default:
+            guard let hash = self.commitHash(in: pathParts.dropFirst(2)) else { return nil }
+
+            return .repositoryCommitHash(repositoryFullName: repositoryFullName, hash: hash)
+        }
+    }
+
+    private static func commitHash(in pathParts: some Sequence<String>) -> String? {
+        pathParts
+            .map { $0.lowercased() }
+            .first { self.isCommitHash($0, allowNumericOnly: true) }
+    }
+
+    private static func issueNumber(from token: String, minimumBareDigits: Int, allowBareNumber: Bool) -> Int? {
+        if token.hasPrefix("#") {
+            return Int(token.dropFirst())
+        }
+        if token.hasPrefix("gh-") {
+            return Int(token.dropFirst(3))
+        }
+        guard allowBareNumber else { return nil }
+        guard token.count >= minimumBareDigits,
+              token.allSatisfy(\.isNumber)
+        else { return nil }
+
+        return Int(token)
+    }
+
+    private static func repositoryIssueNumber(from token: String) -> GitHubReferenceQuery? {
+        let parts = token.split(separator: "#", maxSplits: 1).map(String.init)
+        guard parts.count == 2,
+              let number = Int(parts[1]),
+              self.isRepositoryFullName(parts[0])
+        else { return nil }
+
+        return .repositoryIssueNumber(repositoryFullName: parts[0], number: number)
+    }
+
+    private static func isRepositoryFullName(_ value: String) -> Bool {
+        let parts = value.split(separator: "/", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { return false }
+
+        return parts.allSatisfy { part in
+            part.isEmpty == false && part.allSatisfy { character in
+                character.isLetter || character.isNumber || character == "-" || character == "_" || character == "."
+            }
+        }
+    }
+
+    private static func normalizedToken(from rawToken: String) -> String {
+        rawToken
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: ".,;:()[]{}<>\"'`"))
+            .lowercased()
+    }
+
+    private static func referenceTokens(in text: String) -> [String] {
+        text
+            .split(whereSeparator: \.isWhitespace)
+            .map(String.init)
+            .map(self.normalizedToken)
+            .filter { $0.isEmpty == false }
+    }
+
+    private static func hasCommitContext(_ text: String) -> Bool {
+        let normalized = text.lowercased()
+        return normalized.contains("sha") || normalized.contains("commit") || normalized.contains("hash")
+    }
+
+    private static func isCommitHash(_ token: String, allowNumericOnly: Bool) -> Bool {
+        guard (7 ... 40).contains(token.count) else { return false }
+        guard token.allSatisfy(\.isHexDigit) else { return false }
+        guard allowNumericOnly || token.contains(where: \.isLetter) else { return false }
+
+        return true
+    }
+}

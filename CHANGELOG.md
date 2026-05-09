@@ -8,6 +8,8 @@
 - Hide the repository filter bar when the only available scope would be Local.
 - Resolve copied GitHub issue, pull request, and commit URLs through live GitHub even before signing in.
 - Resolve copied GitHub URLs that embed a commit hash in deeper paths, including pull request changes URLs.
+- Resolve copied short or long commit hashes, including numeric-looking short hashes, and owner/repo#number issue references.
+- Add a CLI reference translator so copied GitHub reference parsing can be tested end to end.
 - Move GitHub reference watcher pasteboard polling off the main thread so the menu bar stays responsive.
 - Restore AppKit-native status item menus, keep the status buttons enabled, and remove the watcher item when no match is visible.
 - Keep GitHub reference watching clipboard-only so RepoBar never needs Accessibility permission or global keyboard monitoring for this feature.
