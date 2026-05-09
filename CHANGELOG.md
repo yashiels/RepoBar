@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.1 - Unreleased
+## 0.5.1 - 2026-05-10
 
 - Let the GitHub reference monitor recognize multiple copied references at once, infer a surrounding `owner/repo` context for bare `#123` items, and group multiple resolved matches into submenus.
 - Infer the GitHub repository for bare references from copied local git paths like `~/Projects/crabbox`.
