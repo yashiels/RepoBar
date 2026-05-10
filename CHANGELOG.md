@@ -2,7 +2,6 @@
 
 ## 0.5.2 - Unreleased
 
-- Move the primary website and iOS universal-link domain to `repo.bar`.
 - Explain in GitHub API Status that rate limits are shared by the GitHub user or actor across PATs, OAuth/GitHub App user tokens, and `gh` CLI requests.
 - Recognize chained and ranged copied references like `owner/repo#70/#71` and `owner/repo#66-#69` as multiple GitHub references.
 - Start inline GitHub reference browser previews below the repository header so pull request content is visible sooner.

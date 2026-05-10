@@ -11,9 +11,9 @@ final class OAuthCoordinator: NSObject, ASWebAuthenticationPresentationContextPr
     private var lastHost: URL = RepoBarAuthDefaults.githubHost
     private var cachedTokens: OAuthTokens?
     private var hasLoadedTokens = false
-    private static let callbackHost = "repo.bar"
+    private static let callbackHost = "repobar.app"
     private static let callbackPath = "/oauth-callback"
-    private static let callbackURL = URL(string: "https://repo.bar/oauth-callback")!
+    private static let callbackURL = URL(string: "https://repobar.app/oauth-callback")!
 
     override init() {
         let store = TokenStore.shared

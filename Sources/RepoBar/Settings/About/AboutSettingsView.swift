@@ -84,7 +84,7 @@ struct AboutSettingsView: View {
 
             VStack(spacing: 6) {
                 AboutLinkRow(icon: "chevron.left.slash.chevron.right", title: "GitHub", url: "https://github.com/steipete/RepoBar")
-                AboutLinkRow(icon: "globe", title: "Website", url: "https://repo.bar")
+                AboutLinkRow(icon: "globe", title: "Website", url: "https://repobar.app")
                 AboutLinkRow(icon: "ant", title: "Issue Tracker", url: "https://github.com/steipete/RepoBar/issues")
                 AboutLinkRow(icon: "envelope", title: "Email", url: "mailto:peter@steipete.me")
             }

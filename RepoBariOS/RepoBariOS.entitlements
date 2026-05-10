@@ -4,8 +4,8 @@
 <dict>
     <key>com.apple.developer.associated-domains</key>
     <array>
-        <string>applinks:repo.bar</string>
-        <string>webcredentials:repo.bar</string>
+        <string>applinks:repobar.app</string>
+        <string>webcredentials:repobar.app</string>
     </array>
     <key>keychain-access-groups</key>
     <array>
