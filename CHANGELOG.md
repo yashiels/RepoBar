@@ -3,7 +3,7 @@
 ## 0.5.2 - Unreleased
 
 - Improve GitHub reference parsing for grouped `owner/repo: #1, #2` issue lists.
-- Bring the iOS app closer to macOS parity with repository search/filter/sort/owner controls, GitHub rate-limit diagnostics, and a manual GitHub reference resolver.
+- Bring the iOS app closer to macOS parity with repository search/filter/sort/owner controls, GitHub rate-limit diagnostics, a manual GitHub reference resolver, share-sheet handoff, and inline reference previews.
 
 ## 0.5.1 - 2026-05-10
 

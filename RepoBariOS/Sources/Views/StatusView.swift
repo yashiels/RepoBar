@@ -5,21 +5,29 @@ import UIKit
 struct StatusView: View {
     @Bindable var appModel: AppModel
     @Environment(\.openURL) private var openURL
-    @State private var referenceText = ""
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var selectedPreviewURL: URL?
 
     private var rateLimitState: RateLimitDisplayState {
         RateLimitDisplayState(diagnostics: appModel.session.diagnostics)
     }
 
-    var body: some View {
-        List {
-            referenceResolverSection
-            resolvedReferencesSection
-            rateLimitSection
+    private var previewURL: URL? {
+        if let selectedPreviewURL,
+           appModel.session.referenceMatches.contains(where: { $0.url == selectedPreviewURL }) {
+            return selectedPreviewURL
         }
+        return appModel.session.referenceMatches.first?.url
+    }
+
+    private var previewHeight: CGFloat {
+        horizontalSizeClass == .regular ? 560 : 360
+    }
+
+    var body: some View {
+        statusContent
         .scrollContentBackground(.hidden)
         .background(GlassBackground())
-        .listStyle(.insetGrouped)
         .navigationTitle("Status")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -33,18 +41,52 @@ struct StatusView: View {
         .task {
             await appModel.refreshRateLimits()
         }
+        .onChange(of: appModel.session.referenceMatches) { _, matches in
+            guard matches.contains(where: { $0.url == selectedPreviewURL }) == false else { return }
+            selectedPreviewURL = matches.first?.url
+        }
+    }
+
+    @ViewBuilder
+    private var statusContent: some View {
+        if horizontalSizeClass == .regular {
+            HStack(alignment: .top, spacing: 0) {
+                List {
+                    referenceResolverSection
+                    resolvedReferencesSection
+                    previewSection
+                }
+                .listStyle(.insetGrouped)
+
+                Divider()
+
+                List {
+                    rateLimitSection
+                }
+                .listStyle(.insetGrouped)
+                .frame(minWidth: 320, idealWidth: 380, maxWidth: 460)
+            }
+        } else {
+            List {
+                referenceResolverSection
+                resolvedReferencesSection
+                previewSection
+                rateLimitSection
+            }
+            .listStyle(.insetGrouped)
+        }
     }
 
     private var referenceResolverSection: some View {
         Section {
-            TextEditor(text: $referenceText)
+            TextEditor(text: $appModel.session.referenceDraftText)
                 .frame(minHeight: 104)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
 
             HStack {
                 Button {
-                    referenceText = UIPasteboard.general.string ?? ""
+                    appModel.session.referenceDraftText = UIPasteboard.general.string ?? ""
                 } label: {
                     Label("Paste", systemImage: "doc.on.clipboard")
                 }
@@ -52,7 +94,7 @@ struct StatusView: View {
                 Spacer()
 
                 Button {
-                    Task { await appModel.resolveReferences(from: referenceText) }
+                    Task { await appModel.resolveReferences(from: appModel.session.referenceDraftText) }
                 } label: {
                     if appModel.session.isResolvingReferences {
                         ProgressView()
@@ -60,7 +102,7 @@ struct StatusView: View {
                         Label("Resolve", systemImage: "magnifyingglass")
                     }
                 }
-                .disabled(referenceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(appModel.session.referenceDraftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         } header: {
             Text("GitHub References")
@@ -82,18 +124,47 @@ struct StatusView: View {
             Section("Matches") {
                 ForEach(appModel.session.referenceMatches, id: \.url) { match in
                     Button {
-                        openURL(match.url)
+                        selectedPreviewURL = match.url
                     } label: {
-                        ReferenceMatchRow(match: match)
+                        ReferenceMatchRow(
+                            match: match,
+                            isSelected: previewURL == match.url
+                        )
                     }
                     .buttonStyle(.plain)
                     .contextMenu {
+                        Button {
+                            openURL(match.url)
+                        } label: {
+                            Label("Open in Browser", systemImage: "safari")
+                        }
                         Button {
                             UIPasteboard.general.string = match.url.absoluteString
                         } label: {
                             Label("Copy URL", systemImage: "doc.on.doc")
                         }
                     }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var previewSection: some View {
+        if let previewURL {
+            Section("Preview") {
+                ReferencePreviewWebView(url: previewURL)
+                    .frame(height: previewHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(.quaternary)
+                    }
+
+                Button {
+                    openURL(previewURL)
+                } label: {
+                    Label("Open in Browser", systemImage: "safari")
                 }
             }
         }
@@ -132,6 +203,7 @@ struct StatusView: View {
 
 private struct ReferenceMatchRow: View {
     let match: GitHubReferenceMatch
+    let isSelected: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -142,6 +214,10 @@ private struct ReferenceMatchRow: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.blue)
+                    }
                     Text(match.query.displayText)
                         .font(.subheadline)
                         .fontWeight(.semibold)

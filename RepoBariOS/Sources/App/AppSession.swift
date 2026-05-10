@@ -20,9 +20,17 @@ final class AppSession {
     var globalActivityError: String?
     var globalCommitEvents: [RepoCommitSummary] = []
     var globalCommitError: String?
+    var referenceDraftText = ""
     var referenceMatches: [GitHubReferenceMatch] = []
     var referenceError: String?
     var isResolvingReferences = false
+}
+
+enum AppTab: Hashable {
+    case repos
+    case activity
+    case status
+    case settings
 }
 
 enum AccountState: Equatable {

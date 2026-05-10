@@ -11,7 +11,7 @@ struct SettingsView: View {
     init(appModel: AppModel, showsCloseButton: Bool = false) {
         self._appModel = Bindable(wrappedValue: appModel)
         self.showsCloseButton = showsCloseButton
-        self._ownerFilterText = State(initialValue: appModel.session.settings.repoList.ownerFilter.joined(separator: ", "))
+        self._ownerFilterText = State(initialValue: OwnerFilterParser.format(appModel.session.settings.repoList.ownerFilter))
     }
 
     var body: some View {
@@ -147,7 +147,7 @@ struct SettingsView: View {
             }
         }
         .onAppear {
-            ownerFilterText = appModel.session.settings.repoList.ownerFilter.joined(separator: ", ")
+            ownerFilterText = OwnerFilterParser.format(appModel.session.settings.repoList.ownerFilter)
         }
     }
 
@@ -170,11 +170,8 @@ struct SettingsView: View {
     }
 
     private func applyOwnerFilterText() {
-        let owners = ownerFilterText
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { $0.isEmpty == false }
+        let owners = OwnerFilterParser.parse(ownerFilterText)
         appModel.session.settings.repoList.ownerFilter = owners
-        ownerFilterText = owners.joined(separator: ", ")
+        ownerFilterText = OwnerFilterParser.format(owners)
     }
 }

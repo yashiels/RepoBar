@@ -114,6 +114,7 @@ final class AppModel {
         self.session.globalActivityEvents = []
         self.session.globalCommitEvents = []
         self.session.contributionHeatmap = []
+        self.session.referenceDraftText = ""
         self.session.referenceMatches = []
         self.session.referenceError = nil
         self.session.isResolvingReferences = false
@@ -138,6 +139,7 @@ final class AppModel {
             self.session.globalActivityEvents = []
             self.session.globalCommitEvents = []
             self.session.contributionHeatmap = []
+            self.session.referenceDraftText = ""
             self.session.referenceMatches = []
             self.session.referenceError = nil
             self.session.isResolvingReferences = false
@@ -213,6 +215,18 @@ final class AppModel {
             self.session.rateLimitError = error.userFacingMessage
         }
         self.session.diagnostics = await self.github.diagnostics()
+    }
+
+    @discardableResult
+    func handleIncomingURL(_ url: URL) -> Bool {
+        guard let text = IncomingReferenceURL.text(from: url) else { return false }
+
+        self.session.referenceDraftText = text
+        self.session.referenceError = nil
+        if self.auth.loadTokens() != nil {
+            Task { await self.resolveReferences(from: text) }
+        }
+        return true
     }
 
     func resolveReferences(from text: String) async {
