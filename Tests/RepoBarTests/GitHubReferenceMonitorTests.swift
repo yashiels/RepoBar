@@ -64,6 +64,34 @@ struct GitHubReferenceMonitorTests {
     }
 
     @Test
+    func `ranged owner repo issue shorthand becomes repository scoped issue series`() {
+        #expect(
+            GitHubReferenceTranslator.queries(from: "openclaw/crabbox#66-#69") == [
+                .repositoryIssueNumber(repositoryFullName: "openclaw/crabbox", number: 66),
+                .repositoryIssueNumber(repositoryFullName: "openclaw/crabbox", number: 67),
+                .repositoryIssueNumber(repositoryFullName: "openclaw/crabbox", number: 68),
+                .repositoryIssueNumber(repositoryFullName: "openclaw/crabbox", number: 69)
+            ]
+        )
+        #expect(
+            GitHubReferenceTranslator.queries(from: "also make openclaw/crabbox#66-#69 work (series)") == [
+                .repositoryIssueNumber(repositoryFullName: "openclaw/crabbox", number: 66),
+                .repositoryIssueNumber(repositoryFullName: "openclaw/crabbox", number: 67),
+                .repositoryIssueNumber(repositoryFullName: "openclaw/crabbox", number: 68),
+                .repositoryIssueNumber(repositoryFullName: "openclaw/crabbox", number: 69)
+            ]
+        )
+        #expect(
+            GitHubReferenceTranslator.queries(from: "openclaw/crabbox#66-69") == [
+                .repositoryIssueNumber(repositoryFullName: "openclaw/crabbox", number: 66),
+                .repositoryIssueNumber(repositoryFullName: "openclaw/crabbox", number: 67),
+                .repositoryIssueNumber(repositoryFullName: "openclaw/crabbox", number: 68),
+                .repositoryIssueNumber(repositoryFullName: "openclaw/crabbox", number: 69)
+            ]
+        )
+    }
+
+    @Test
     func `github issue and pr urls become repository scoped issue queries`() {
         #expect(
             GitHubReferenceTranslator.query(from: "https://github.com/openclaw/openclaw/issues/73655") ==

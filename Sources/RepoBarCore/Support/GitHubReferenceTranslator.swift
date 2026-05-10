@@ -3,6 +3,7 @@ import Foundation
 public enum GitHubReferenceTranslator {
     public static let defaultMinimumBareDigits = 1
     private static let maxScannedTextLength = 8000
+    private static let maxIssueSeriesCount = 100
 
     public static func query(
         from rawText: String,
@@ -46,7 +47,7 @@ public enum GitHubReferenceTranslator {
             if let query = self.urlQuery(from: token) {
                 append(query)
             }
-            for query in self.chainedRepositoryIssueQueries(from: token) {
+            for query in self.compoundRepositoryIssueQueries(from: token) {
                 append(query)
             }
         }
@@ -194,30 +195,58 @@ public enum GitHubReferenceTranslator {
         return .repositoryIssueNumber(repositoryFullName: parts[0], number: number)
     }
 
-    private static func chainedRepositoryIssueQueries(from token: String) -> [GitHubReferenceQuery] {
+    private static func compoundRepositoryIssueQueries(from token: String) -> [GitHubReferenceQuery] {
         let parts = token.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
         guard parts.count == 2,
               self.isRepositoryFullName(parts[0]),
-              parts[1].contains("/")
+              parts[1].contains("/") || parts[1].contains("-")
         else { return [] }
 
-        let rawNumbers = parts[1]
+        let numberParts = parts[1]
             .split(separator: "/", omittingEmptySubsequences: false)
             .map(String.init)
-        guard rawNumbers.isEmpty == false else { return [] }
+        guard numberParts.isEmpty == false else { return [] }
 
         var numbers: [Int] = []
-        for rawNumber in rawNumbers {
-            let normalized = rawNumber.hasPrefix("#") ? String(rawNumber.dropFirst()) : rawNumber
-            guard normalized.isEmpty == false,
-                  normalized.allSatisfy(\.isNumber),
-                  let number = Int(normalized)
+        for numberPart in numberParts {
+            guard let parsedNumbers = self.issueNumbers(fromSeriesPart: numberPart)
             else { return [] }
 
-            numbers.append(number)
+            numbers.append(contentsOf: parsedNumbers)
         }
+        guard (1 ... Self.maxIssueSeriesCount).contains(numbers.count) else { return [] }
 
         return numbers.map { .repositoryIssueNumber(repositoryFullName: parts[0], number: $0) }
+    }
+
+    private static func issueNumbers(fromSeriesPart rawPart: String) -> [Int]? {
+        let part = rawPart.hasPrefix("#") ? String(rawPart.dropFirst()) : rawPart
+        guard part.isEmpty == false else { return nil }
+
+        let rangeParts = part
+            .split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
+            .map(String.init)
+        if rangeParts.count == 2 {
+            guard let start = self.issueSeriesNumber(from: rangeParts[0]),
+                  let end = self.issueSeriesNumber(from: rangeParts[1]),
+                  start <= end
+            else { return nil }
+
+            return Array(start ... end)
+        }
+
+        guard let number = self.issueSeriesNumber(from: part) else { return nil }
+
+        return [number]
+    }
+
+    private static func issueSeriesNumber(from rawNumber: String) -> Int? {
+        let normalized = rawNumber.hasPrefix("#") ? String(rawNumber.dropFirst()) : rawNumber
+        guard normalized.isEmpty == false,
+              normalized.allSatisfy(\.isNumber)
+        else { return nil }
+
+        return Int(normalized)
     }
 
     private static func isRepositoryFullName(_ value: String) -> Bool {

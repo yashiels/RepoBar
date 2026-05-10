@@ -2,7 +2,7 @@
 
 ## 0.5.2 - Unreleased
 
-- Recognize chained copied references like `owner/repo#70/#71` as multiple GitHub references.
+- Recognize chained and ranged copied references like `owner/repo#70/#71` and `owner/repo#66-#69` as multiple GitHub references.
 - Start inline GitHub reference browser previews below the repository header so pull request content is visible sooner.
 - Improve GitHub reference parsing for grouped `owner/repo: #1, #2` issue lists.
 - Rename the GitHub rate-limit menu to GitHub API Status and show the current blocker, shared-token note, endpoint cooldowns, live bucket quotas, and sample age as separate lines.
