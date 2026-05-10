@@ -48,6 +48,17 @@ public enum GitHubReferenceTranslator {
             }
         }
 
+        let groupedQueries = self.groupedRepositoryIssueQueries(in: text)
+        let groupedIssueNumbers = Set(groupedQueries.compactMap { query in
+            if case let .repositoryIssueNumber(_, number) = query {
+                return number
+            }
+            return nil
+        })
+        for query in groupedQueries {
+            append(query)
+        }
+
         let allowsNumericCommitHash = self.hasCommitContext(text)
         for token in tokens {
             if let query = self.tokenQuery(
@@ -56,11 +67,36 @@ public enum GitHubReferenceTranslator {
                 allowBareIssueNumber: false,
                 allowNumericCommitHash: allowsNumericCommitHash
             ) {
+                if case let .issueNumber(number) = query, groupedIssueNumbers.contains(number) {
+                    continue
+                }
                 append(self.applyingRepositoryContext(repositoryContext, to: query))
             }
         }
 
         return queries
+    }
+
+    private static func groupedRepositoryIssueQueries(in text: String) -> [GitHubReferenceQuery] {
+        text
+            .split(whereSeparator: \.isNewline)
+            .flatMap { self.groupedRepositoryIssueQueries(inLine: String($0)) }
+    }
+
+    private static func groupedRepositoryIssueQueries(inLine line: String) -> [GitHubReferenceQuery] {
+        guard let colon = line.firstIndex(of: ":") else { return [] }
+
+        let prefixTokens = self.referenceTokens(in: String(line[..<colon]))
+        guard let repositoryFullName = prefixTokens.last(where: self.isRepositoryFullName) else { return [] }
+
+        return self.referenceTokens(in: String(line[line.index(after: colon)...]))
+            .compactMap { token in
+                guard let number = self.issueNumber(from: token, minimumBareDigits: 1, allowBareNumber: false) else {
+                    return nil
+                }
+
+                return .repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number)
+            }
     }
 
     private static func tokenQuery(

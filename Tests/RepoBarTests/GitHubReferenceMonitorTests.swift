@@ -106,6 +106,34 @@ struct GitHubReferenceMonitorTests {
     }
 
     @Test
+    func `multiple grouped issue references use line scoped repository context`() {
+        let text = """
+            - openclaw/discrawl: #61, #62, #63
+            - openclaw/acpx: #294, #295, #296, #297, #303
+            - openclaw/openclaw.ai: #132, #133, #134
+            - steipete/oracle: #188
+            - openclaw/spogo: #26
+            - openclaw/gitcrawl: #14
+        """
+        #expect(GitHubReferenceTranslator.queries(from: text) == [
+            .repositoryIssueNumber(repositoryFullName: "openclaw/discrawl", number: 61),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/discrawl", number: 62),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/discrawl", number: 63),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/acpx", number: 294),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/acpx", number: 295),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/acpx", number: 296),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/acpx", number: 297),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/acpx", number: 303),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/openclaw.ai", number: 132),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/openclaw.ai", number: 133),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/openclaw.ai", number: 134),
+            .repositoryIssueNumber(repositoryFullName: "steipete/oracle", number: 188),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/spogo", number: 26),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/gitcrawl", number: 14)
+        ])
+    }
+
+    @Test
     func `multiple parser ignores slash words that are not repository context`() {
         let text = """
         Found items in openclaw/gogcli.

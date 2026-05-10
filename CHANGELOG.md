@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.2 - Unreleased
+
+- Improve GitHub reference parsing for grouped `owner/repo: #1, #2` issue lists.
+
 ## 0.5.1 - 2026-05-10
 
 - Let the GitHub reference monitor recognize multiple copied references at once, infer a surrounding `owner/repo` context for bare `#123` items, and group multiple resolved matches into submenus.
