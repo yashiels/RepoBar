@@ -777,24 +777,8 @@ private extension StatusBarMenuManager {
     }
 
     func addGitHubReferenceItems(to menu: NSMenu, match: GitHubReferenceMatch, includeBrowserPreview: Bool) {
-        let openTitle = "Open \(match.query.displayText) in Browser"
-        let openItem = NSMenuItem(title: openTitle, action: #selector(self.openGitHubReferenceMatch(_:)), keyEquivalent: "")
-        openItem.target = self
-        openItem.representedObject = match.url
-        openItem.image = NSImage(systemSymbolName: "safari", accessibilityDescription: "Open in Browser")
-        openItem.image?.isTemplate = true
-        menu.addItem(openItem)
-
-        let copyItem = NSMenuItem(title: "Copy URL", action: #selector(self.copyGitHubReferenceURL(_:)), keyEquivalent: "")
-        copyItem.target = self
-        copyItem.representedObject = match.url
-        copyItem.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: "Copy URL")
-        copyItem.image?.isTemplate = true
-        menu.addItem(copyItem)
-
         guard includeBrowserPreview else { return }
 
-        menu.addItem(.separator())
         let browserItem = NSMenuItem()
         let browserView = GitHubReferenceBrowserMenuItemView(match: match)
         if self.shouldPreloadGitHubReferenceBrowserPreview, self.appState.session.gitHubReferenceMatches.count <= 1 {
