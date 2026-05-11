@@ -227,6 +227,10 @@ public struct LocalRepoIndex: Equatable, Sendable {
         return nil
     }
 
+    public func status(forRepositoryName name: String) -> LocalRepoStatus? {
+        self.uniqueStatus(forName: name)
+    }
+
     public func status(containingPath path: String) -> LocalRepoStatus? {
         let normalizedPath = URL(fileURLWithPath: PathFormatter.expandTilde(path)).standardizedFileURL.path
         if let exact = self.byPath[normalizedPath] { return exact }

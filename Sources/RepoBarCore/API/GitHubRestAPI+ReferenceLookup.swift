@@ -19,6 +19,7 @@ extension GitHubRestAPI {
         for repo in repositories where repo.viewerCanRead && query.matches(repo: repo) {
             switch query {
             case let .issueNumber(number),
+                 let .repositoryNameIssueNumber(_, number),
                  let .repositoryIssueNumber(_, number):
                 matches.append(contentsOf: self.cachedIssueNumberMatches(query: query, number: number, repo: repo, context: context))
             case let .commitHash(hash),
@@ -36,6 +37,7 @@ extension GitHubRestAPI {
         for repo in repositories where repo.viewerCanRead && query.matches(repo: repo) {
             let match: GitHubReferenceMatch? = switch query {
             case let .issueNumber(number),
+                 let .repositoryNameIssueNumber(_, number),
                  let .repositoryIssueNumber(_, number):
                 await self.liveIssueNumberMatch(query: query, number: number, repo: repo)
             case let .commitHash(hash),
@@ -53,7 +55,7 @@ extension GitHubRestAPI {
 
     func liveReferenceMatch(query: GitHubReferenceQuery) async -> GitHubReferenceMatch? {
         switch query {
-        case .issueNumber, .commitHash:
+        case .issueNumber, .repositoryNameIssueNumber, .commitHash:
             nil
         case let .repositoryIssueNumber(repositoryFullName, number):
             await self.liveIssueNumberMatch(query: query, number: number, repositoryFullName: repositoryFullName)
@@ -361,9 +363,14 @@ extension GitHubRestAPI {
 
 private extension GitHubReferenceQuery {
     func matches(repo: Repository) -> Bool {
-        guard let repositoryFullName else { return true }
+        if let repositoryFullName {
+            return repo.fullName.caseInsensitiveCompare(repositoryFullName) == .orderedSame
+        }
+        if let repositoryName {
+            return repo.name.caseInsensitiveCompare(repositoryName) == .orderedSame
+        }
 
-        return repo.fullName.caseInsensitiveCompare(repositoryFullName) == .orderedSame
+        return true
     }
 }
 

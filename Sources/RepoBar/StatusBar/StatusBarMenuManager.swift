@@ -882,6 +882,7 @@ private extension StatusBarMenuManager {
     func gitHubReferenceText(for match: GitHubReferenceMatch) -> String {
         switch match.query {
         case let .issueNumber(number),
+             let .repositoryNameIssueNumber(_, number),
              let .repositoryIssueNumber(_, number):
             "#\(number)"
         case let .commitHash(hash),

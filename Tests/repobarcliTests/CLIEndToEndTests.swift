@@ -90,6 +90,22 @@ struct CLIEndToEndTests {
 
     @Test
     @MainActor
+    func `reference translate command parses copied repo name issue shorthand`() async throws {
+        let output = try await runCLI([
+            "reference-translate",
+            "discrawl#64",
+            "--json"
+        ])
+        let data = try #require(output.data(using: .utf8))
+        let decoded = try JSONDecoder().decode(ReferenceTranslationOutput.self, from: data)
+        #expect(decoded.matched)
+        #expect(decoded.query == "repositoryNameIssueNumber")
+        #expect(decoded.repositoryName == "discrawl")
+        #expect(decoded.number == 64)
+    }
+
+    @Test
+    @MainActor
     func `reference translate command parses copied short sha`() async throws {
         let output = try await runCLI([
             "reference-translate",

@@ -115,6 +115,9 @@ public enum GitHubReferenceTranslator {
         if let scopedIssue = self.repositoryIssueNumber(from: token) {
             return scopedIssue
         }
+        if let namedIssue = self.repositoryNameIssueNumber(from: token) {
+            return namedIssue
+        }
         if self.isCommitHash(token, allowNumericOnly: allowNumericCommitHash) {
             return .commitHash(token)
         }
@@ -202,6 +205,16 @@ public enum GitHubReferenceTranslator {
         return .repositoryIssueNumber(repositoryFullName: parts[0], number: number)
     }
 
+    private static func repositoryNameIssueNumber(from token: String) -> GitHubReferenceQuery? {
+        let parts = token.split(separator: "#", maxSplits: 1).map(String.init)
+        guard parts.count == 2,
+              let number = Int(parts[1]),
+              self.isRepositoryName(parts[0])
+        else { return nil }
+
+        return .repositoryNameIssueNumber(repositoryName: parts[0], number: number)
+    }
+
     private static func compoundRepositoryIssueQueries(from token: String) -> [GitHubReferenceQuery] {
         let parts = token.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
         guard parts.count == 2,
@@ -267,6 +280,12 @@ public enum GitHubReferenceTranslator {
         }
     }
 
+    private static func isRepositoryName(_ value: String) -> Bool {
+        value.isEmpty == false && value.allSatisfy { character in
+            character.isLetter || character.isNumber || character == "-" || character == "_" || character == "."
+        }
+    }
+
     private static func repositoryContext(in tokens: [String]) -> String? {
         var repositoryFullNames: [String] = []
         var seen: Set<String> = []
@@ -307,6 +326,12 @@ public enum GitHubReferenceTranslator {
 
         switch query {
         case let .issueNumber(number):
+            return .repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number)
+        case let .repositoryNameIssueNumber(repositoryName, number):
+            guard repositoryFullName.split(separator: "/").last?.caseInsensitiveCompare(repositoryName) == .orderedSame else {
+                return query
+            }
+
             return .repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number)
         case let .commitHash(hash):
             return .repositoryCommitHash(repositoryFullName: repositoryFullName, hash: hash)

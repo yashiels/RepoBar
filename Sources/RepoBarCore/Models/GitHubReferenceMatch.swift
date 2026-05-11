@@ -32,6 +32,7 @@ public enum GitHubReferenceState: String, Sendable, Hashable {
 
 public enum GitHubReferenceQuery: Sendable, Hashable {
     case issueNumber(Int)
+    case repositoryNameIssueNumber(repositoryName: String, number: Int)
     case repositoryIssueNumber(repositoryFullName: String, number: Int)
     case commitHash(String)
     case repositoryCommitHash(repositoryFullName: String, hash: String)
@@ -40,6 +41,7 @@ public enum GitHubReferenceQuery: Sendable, Hashable {
     public var displayText: String {
         switch self {
         case let .issueNumber(number): "#\(number)"
+        case let .repositoryNameIssueNumber(repositoryName, number): "\(repositoryName)#\(number)"
         case let .repositoryIssueNumber(repositoryFullName, number): "\(repositoryFullName)#\(number)"
         case let .commitHash(hash): String(hash.prefix(10))
         case let .repositoryCommitHash(repositoryFullName, hash): "\(repositoryFullName)@\(hash.prefix(10))"
@@ -49,12 +51,25 @@ public enum GitHubReferenceQuery: Sendable, Hashable {
 
     public var repositoryFullName: String? {
         switch self {
-        case .issueNumber, .commitHash:
+        case .issueNumber, .repositoryNameIssueNumber, .commitHash:
             nil
         case let .repositoryIssueNumber(repositoryFullName, _),
              let .repositoryCommitHash(repositoryFullName, _),
              let .repositoryWorkflowRun(repositoryFullName, _):
             repositoryFullName
+        }
+    }
+
+    public var repositoryName: String? {
+        switch self {
+        case .issueNumber, .commitHash:
+            nil
+        case let .repositoryNameIssueNumber(repositoryName, _):
+            repositoryName
+        case let .repositoryIssueNumber(repositoryFullName, _),
+             let .repositoryCommitHash(repositoryFullName, _),
+             let .repositoryWorkflowRun(repositoryFullName, _):
+            repositoryFullName.split(separator: "/").last.map(String.init)
         }
     }
 

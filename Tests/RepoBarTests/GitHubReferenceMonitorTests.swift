@@ -48,6 +48,18 @@ struct GitHubReferenceMonitorTests {
     }
 
     @Test
+    func `repo name issue shorthand becomes repository name scoped issue query`() {
+        #expect(
+            GitHubReferenceTranslator.query(from: "discrawl#64") ==
+                .repositoryNameIssueNumber(repositoryName: "discrawl", number: 64)
+        )
+        #expect(
+            GitHubReferenceTranslator.query(from: " Discrawl#64. ") ==
+                .repositoryNameIssueNumber(repositoryName: "discrawl", number: 64)
+        )
+    }
+
+    @Test
     func `chained owner repo issue shorthand becomes multiple repository scoped issue queries`() {
         #expect(
             GitHubReferenceTranslator.queries(from: "openclaw/crabbox#70/#71") == [
@@ -295,10 +307,31 @@ struct GitHubReferenceMonitorTests {
         )
         let queries = await GitHubReferenceLocalContext.queries(
             [.commitHash(shortSHA)],
-            applyingLocalCommitContextFrom: LocalRepoIndex(statuses: [status])
+            applyingLocalRepositoryContextFrom: LocalRepoIndex(statuses: [status])
         )
 
         #expect(queries == [.repositoryCommitHash(repositoryFullName: "steipete/RepoBar", hash: shortSHA)])
+    }
+
+    @Test
+    func `repo name issue references inherit unique local repository context`() async {
+        let status = LocalRepoStatus(
+            path: URL(fileURLWithPath: "/tmp/discrawl"),
+            name: "discrawl",
+            fullName: "openclaw/discrawl",
+            branch: "main",
+            isClean: true,
+            aheadCount: 0,
+            behindCount: 0,
+            syncState: .synced
+        )
+
+        let queries = await GitHubReferenceLocalContext.queries(
+            [.repositoryNameIssueNumber(repositoryName: "discrawl", number: 64)],
+            applyingLocalRepositoryContextFrom: LocalRepoIndex(statuses: [status])
+        )
+
+        #expect(queries == [.repositoryIssueNumber(repositoryFullName: "openclaw/discrawl", number: 64)])
     }
 
     @Test

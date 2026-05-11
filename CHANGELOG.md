@@ -2,6 +2,7 @@
 
 ## 0.5.2 - Unreleased
 
+- Recognize copied repository-name issue references like `discrawl#64` and resolve them against a unique local or accessible GitHub repository.
 - Resolve bare copied commit hashes like `0213e9d` against local repositories before falling back to broad GitHub lookup.
 - Recognize copied GitHub Actions run URLs like `owner/repo/actions/runs/123` as GitHub references.
 - Move GitHub reference preview actions into an inline browser header with Back, Copy, and Open controls while keeping the preview's persistent GitHub web session.

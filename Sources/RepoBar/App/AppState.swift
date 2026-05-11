@@ -216,7 +216,7 @@ final class AppState {
         guard let repositoryFullName else {
             return await GitHubReferenceLocalContext.queries(
                 queries,
-                applyingLocalCommitContextFrom: self.session.localRepoIndex
+                applyingLocalRepositoryContextFrom: self.session.localRepoIndex
             )
         }
 
@@ -234,6 +234,8 @@ final class AppState {
     ) async -> GitHubReferenceMatch? {
         let candidateRepositories = if let repositoryFullName = query.repositoryFullName {
             repositories.filter { $0.fullName.caseInsensitiveCompare(repositoryFullName) == .orderedSame }
+        } else if let repositoryName = query.repositoryName {
+            repositories.filter { $0.name.caseInsensitiveCompare(repositoryName) == .orderedSame }
         } else {
             repositories
         }

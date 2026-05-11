@@ -168,6 +168,12 @@ struct RepoBarCoreModelsTests {
         #expect(GitHubReferenceState.closed.label == "Closed")
         #expect(GitHubReferenceState.merged.label == "Merged")
         #expect(
+            GitHubReferenceQuery.repositoryNameIssueNumber(
+                repositoryName: "discrawl",
+                number: 64
+            ).displayText == "discrawl#64"
+        )
+        #expect(
             GitHubReferenceQuery.repositoryIssueNumber(
                 repositoryFullName: "openclaw/openclaw",
                 number: 73655

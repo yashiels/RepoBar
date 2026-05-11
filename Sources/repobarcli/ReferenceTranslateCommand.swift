@@ -54,6 +54,9 @@ struct ReferenceTranslateCommand: CommanderRunnableCommand {
         if let repositoryFullName = result.repositoryFullName {
             print("repo: \(repositoryFullName)")
         }
+        if let repositoryName = result.repositoryName {
+            print("repo-name: \(repositoryName)")
+        }
         if let number = result.number {
             print("number: \(number)")
         }
@@ -77,6 +80,7 @@ struct ReferenceTranslationOutput: Codable, Equatable {
         let query: String
         let displayText: String
         let repositoryFullName: String?
+        let repositoryName: String?
         let number: Int?
         let hash: String?
         let runID: Int64?
@@ -85,6 +89,7 @@ struct ReferenceTranslationOutput: Codable, Equatable {
             self.query = ReferenceTranslationOutput.queryName(query)
             self.displayText = query.displayText
             self.repositoryFullName = query.repositoryFullName
+            self.repositoryName = query.repositoryName
             self.number = ReferenceTranslationOutput.number(query)
             self.hash = ReferenceTranslationOutput.hash(query)
             self.runID = ReferenceTranslationOutput.runID(query)
@@ -96,6 +101,7 @@ struct ReferenceTranslationOutput: Codable, Equatable {
     let query: String?
     let displayText: String?
     let repositoryFullName: String?
+    let repositoryName: String?
     let number: Int?
     let hash: String?
     let runID: Int64?
@@ -112,6 +118,7 @@ struct ReferenceTranslationOutput: Codable, Equatable {
         self.query = primaryQuery.map(Self.queryName)
         self.displayText = primaryQuery?.displayText
         self.repositoryFullName = primaryQuery?.repositoryFullName
+        self.repositoryName = primaryQuery?.repositoryName
         self.number = primaryQuery.flatMap(Self.number)
         self.hash = primaryQuery.flatMap(Self.hash)
         self.runID = primaryQuery.flatMap(Self.runID)
@@ -122,6 +129,8 @@ struct ReferenceTranslationOutput: Codable, Equatable {
         switch query {
         case .issueNumber:
             "issueNumber"
+        case .repositoryNameIssueNumber:
+            "repositoryNameIssueNumber"
         case .repositoryIssueNumber:
             "repositoryIssueNumber"
         case .commitHash:
@@ -135,7 +144,9 @@ struct ReferenceTranslationOutput: Codable, Equatable {
 
     private static func number(_ query: GitHubReferenceQuery) -> Int? {
         switch query {
-        case let .issueNumber(number), let .repositoryIssueNumber(_, number):
+        case let .issueNumber(number),
+             let .repositoryNameIssueNumber(_, number),
+             let .repositoryIssueNumber(_, number):
             number
         case .commitHash, .repositoryCommitHash, .repositoryWorkflowRun:
             nil
@@ -144,7 +155,7 @@ struct ReferenceTranslationOutput: Codable, Equatable {
 
     private static func hash(_ query: GitHubReferenceQuery) -> String? {
         switch query {
-        case .issueNumber, .repositoryIssueNumber, .repositoryWorkflowRun:
+        case .issueNumber, .repositoryNameIssueNumber, .repositoryIssueNumber, .repositoryWorkflowRun:
             nil
         case let .commitHash(hash), let .repositoryCommitHash(_, hash):
             hash
@@ -153,7 +164,7 @@ struct ReferenceTranslationOutput: Codable, Equatable {
 
     private static func runID(_ query: GitHubReferenceQuery) -> Int64? {
         switch query {
-        case .issueNumber, .repositoryIssueNumber, .commitHash, .repositoryCommitHash:
+        case .issueNumber, .repositoryNameIssueNumber, .repositoryIssueNumber, .commitHash, .repositoryCommitHash:
             nil
         case let .repositoryWorkflowRun(_, runID):
             runID

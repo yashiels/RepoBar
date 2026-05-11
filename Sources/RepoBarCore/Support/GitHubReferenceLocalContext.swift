@@ -13,6 +13,12 @@ public enum GitHubReferenceLocalContext {
             switch query {
             case let .issueNumber(number):
                 .repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number)
+            case let .repositoryNameIssueNumber(repositoryName, number):
+                if repositoryFullName.split(separator: "/").last?.caseInsensitiveCompare(repositoryName) == .orderedSame {
+                    .repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number)
+                } else {
+                    query
+                }
             case let .commitHash(hash):
                 .repositoryCommitHash(repositoryFullName: repositoryFullName, hash: hash)
             case .repositoryIssueNumber, .repositoryCommitHash, .repositoryWorkflowRun:
@@ -23,13 +29,19 @@ public enum GitHubReferenceLocalContext {
 
     public static func queries(
         _ queries: [GitHubReferenceQuery],
-        applyingLocalCommitContextFrom localRepoIndex: LocalRepoIndex
+        applyingLocalRepositoryContextFrom localRepoIndex: LocalRepoIndex
     ) async -> [GitHubReferenceQuery] {
         var scopedQueries: [GitHubReferenceQuery] = []
         scopedQueries.reserveCapacity(queries.count)
 
         for query in queries {
             switch query {
+            case let .repositoryNameIssueNumber(repositoryName, number):
+                if let repositoryFullName = localRepoIndex.status(forRepositoryName: repositoryName)?.fullName {
+                    scopedQueries.append(.repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number))
+                } else {
+                    scopedQueries.append(query)
+                }
             case let .commitHash(hash):
                 if let repositoryFullName = await self.repositoryFullName(containingCommitHash: hash, localRepoIndex: localRepoIndex) {
                     scopedQueries.append(.repositoryCommitHash(repositoryFullName: repositoryFullName, hash: hash))
