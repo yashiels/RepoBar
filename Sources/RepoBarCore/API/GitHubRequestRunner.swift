@@ -143,7 +143,7 @@ actor GitHubRequestRunner {
     ) -> URLRequest {
         var request = URLRequest(
             url: url,
-            cachePolicy: useETag ? .reloadIgnoringLocalCacheData : .useProtocolCachePolicy
+            cachePolicy: .reloadIgnoringLocalCacheData
         )
         // GitHub requires "Bearer" for OAuth access tokens; "token" is for classic tokens.
         request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

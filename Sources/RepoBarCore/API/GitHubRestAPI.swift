@@ -78,8 +78,34 @@ struct GitHubRestAPI {
         let token = try await tokenProvider()
         let baseURL = await self.apiHost()
         let url = baseURL.appending(path: "/user")
-        let (data, _) = try await authorizedGet(url: url, token: token)
+        let (data, _) = try await authorizedGet(url: url, token: token, useETag: false)
         return try GitHubDecoding.decode(CurrentUser.self, from: data)
+    }
+
+    func fetchUserOrganizations() async throws -> [String] {
+        let token = try await tokenProvider()
+        let baseURL = await self.apiHost()
+        let (data, _) = try await authorizedGet(
+            url: baseURL.appending(path: "/user/orgs"),
+            token: token,
+            allowedStatuses: [200, 304],
+            useETag: false
+        )
+        let orgs = try GitHubDecoding.decode([UserOrganization].self, from: data)
+        return orgs.map(\.login)
+    }
+
+    func fetchOrganizationPlan(org: String) async throws -> String? {
+        let token = try await tokenProvider()
+        let baseURL = await self.apiHost()
+        let (data, _) = try await authorizedGet(
+            url: baseURL.appending(path: "/orgs/\(org)"),
+            token: token,
+            allowedStatuses: [200, 304, 403, 404],
+            useETag: false
+        )
+        let detail = try? GitHubDecoding.decode(OrganizationDetail.self, from: data)
+        return detail?.plan?.name
     }
 
     func rateLimitResources() async throws -> RateLimitResourcesSnapshot {
@@ -668,6 +694,150 @@ struct GitHubRestAPI {
         return collected
     }
 
+    // MARK: - Actions Runners
+
+    func selfHostedRunners(owner: String, repo: String?) async throws -> ActionsRunnerInfo {
+        let token = try await tokenProvider()
+        let baseURL = await apiHost()
+        let now = Date()
+        let path = if let repo {
+            "/repos/\(owner)/\(repo)/actions/runners"
+        } else {
+            "/orgs/\(owner)/actions/runners"
+        }
+        let (data, _) = try await authorizedGet(
+            url: baseURL.appending(path: path),
+            token: token,
+            allowedStatuses: [200, 304, 404]
+        )
+        let decoded = try GitHubDecoding.decode(RunnersResponse.self, from: data)
+        let runners = decoded.runners.map { runner in
+            RunnerSummary(
+                id: runner.id,
+                name: runner.name,
+                os: runner.os,
+                status: runner.status,
+                busy: runner.busy,
+                labels: runner.labels.map(\.name)
+            )
+        }
+        return ActionsRunnerInfo(totalCount: decoded.totalCount, runners: runners, fetchedAt: now)
+    }
+
+    // MARK: - Actions Queue Status
+
+    func actionsQueueStatus(owner: String, name: String) async throws -> ActionsQueueStatus {
+        let token = try await tokenProvider()
+        let baseURL = await apiHost()
+        let now = Date()
+
+        let inProgressURL = self.actionsRunsURL(
+            baseURL: baseURL, owner: owner, name: name, status: "in_progress"
+        )
+        let queuedURL = self.actionsRunsURL(
+            baseURL: baseURL, owner: owner, name: name, status: "queued"
+        )
+
+        async let inProgressData = authorizedGet(url: inProgressURL, token: token, allowedStatuses: [200, 304, 404])
+        async let queuedData = authorizedGet(url: queuedURL, token: token, allowedStatuses: [200, 304, 404])
+
+        let (ipData, _) = try await inProgressData
+        let (qData, _) = try await queuedData
+
+        let ipResponse = try? GitHubDecoding.decode(ActionsRunsResponse.self, from: ipData)
+        let qResponse = try? GitHubDecoding.decode(ActionsRunsResponse.self, from: qData)
+
+        let ipCount = ipResponse?.totalCount ?? 0
+        let qCount = qResponse?.totalCount ?? 0
+
+        let repoFullName = "\(owner)/\(name)"
+        var runs: [ActiveWorkflowRun] = []
+        for wr in (ipResponse?.workflowRuns ?? []) + (qResponse?.workflowRuns ?? []) {
+            guard let id = wr.id else { continue }
+            runs.append(ActiveWorkflowRun(
+                id: id,
+                name: wr.name ?? "Workflow",
+                repoFullName: wr.repository?.fullName ?? repoFullName,
+                headBranch: wr.headBranch ?? "",
+                status: wr.status ?? "unknown",
+                event: wr.event ?? "",
+                actor: wr.actor?.login ?? "",
+                htmlURL: wr.htmlUrl,
+                startedAt: wr.createdAt
+            ))
+        }
+
+        return ActionsQueueStatus(inProgressCount: ipCount, queuedCount: qCount, runs: runs, fetchedAt: now)
+    }
+
+    // MARK: - Actions Billing Usage (Enhanced Billing Platform)
+
+    func actionsBillingUsage(owner: String, isOrg: Bool) async throws -> ActionsUsageInfo {
+        let token = try await tokenProvider()
+        let baseURL = await apiHost()
+        let now = Date()
+        let path = isOrg
+            ? "/organizations/\(owner)/settings/billing/usage"
+            : "/users/\(owner)/settings/billing/usage"
+        var components = URLComponents(
+            url: baseURL.appending(path: path),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [URLQueryItem(name: "product", value: "actions")]
+        let (data, _) = try await authorizedGet(
+            url: components.url!,
+            token: token,
+            allowedStatuses: [200, 304, 403, 404],
+            headers: ["X-GitHub-Api-Version": "2026-03-10"]
+        )
+        let decoded = try GitHubDecoding.decode(BillingUsageResponse.self, from: data)
+        let items = decoded.usageItems.map { item in
+            ActionsUsageItem(
+                date: item.date,
+                product: item.product,
+                sku: item.sku,
+                quantity: item.quantity,
+                unitType: item.unitType,
+                pricePerUnit: item.pricePerUnit,
+                grossAmount: item.grossAmount,
+                netAmount: item.netAmount,
+                organizationName: item.organizationName,
+                repositoryName: item.repositoryName
+            )
+        }
+        return ActionsUsageInfo(items: items, fetchedAt: now)
+    }
+
+    // MARK: - Hosted Runner Limits
+
+    func hostedRunnerLimits(org: String) async throws -> HostedRunnerLimits {
+        let token = try await tokenProvider()
+        let baseURL = await apiHost()
+        let now = Date()
+        let (data, _) = try await authorizedGet(
+            url: baseURL.appending(path: "/orgs/\(org)/actions/hosted-runners/limits"),
+            token: token,
+            allowedStatuses: [200, 304, 403, 404]
+        )
+        let decoded = try GitHubDecoding.decode(HostedRunnerLimitsResponse.self, from: data)
+        let publicIPs = decoded.publicIps.map {
+            HostedRunnerLimits.ResourceLimit(maximum: $0.maximum, currentUsage: $0.currentUsage)
+        }
+        return HostedRunnerLimits(publicIPs: publicIPs, fetchedAt: now)
+    }
+
+    private func actionsRunsURL(baseURL: URL, owner: String, name: String, status: String) -> URL {
+        var components = URLComponents(
+            url: baseURL.appending(path: "/repos/\(owner)/\(name)/actions/runs"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "status", value: status),
+            URLQueryItem(name: "per_page", value: "10")
+        ]
+        return components.url!
+    }
+
     func authorizedGet(
         url: URL,
         token: String,
@@ -724,5 +894,88 @@ private struct RateLimitResourceResponse: Decodable {
         case used
         case remaining
         case reset
+    }
+}
+
+// MARK: - Actions Runner Wire Models
+
+private struct RunnersResponse: Decodable {
+    let totalCount: Int
+    let runners: [RunnerResponse]
+
+    enum CodingKeys: String, CodingKey {
+        case totalCount = "total_count"
+        case runners
+    }
+}
+
+private struct RunnerResponse: Decodable {
+    let id: Int
+    let name: String
+    let os: String
+    let status: String
+    let busy: Bool
+    let labels: [RunnerLabelResponse]
+}
+
+private struct RunnerLabelResponse: Decodable {
+    let name: String
+}
+
+// MARK: - Enhanced Billing Platform Wire Models
+
+private struct BillingUsageResponse: Decodable {
+    let usageItems: [BillingUsageItemResponse]
+
+    enum CodingKeys: String, CodingKey {
+        case usageItems = "usageItems"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.usageItems = (try? container.decode([BillingUsageItemResponse].self, forKey: .usageItems)) ?? []
+    }
+}
+
+private struct BillingUsageItemResponse: Decodable {
+    let date: String
+    let product: String
+    let sku: String
+    let quantity: Double
+    let unitType: String
+    let pricePerUnit: Double
+    let grossAmount: Double
+    let netAmount: Double
+    let organizationName: String?
+    let repositoryName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case date, product, sku, quantity
+        case unitType = "unitType"
+        case pricePerUnit = "pricePerUnit"
+        case grossAmount = "grossAmount"
+        case netAmount = "netAmount"
+        case organizationName = "organizationName"
+        case repositoryName = "repositoryName"
+    }
+}
+
+// MARK: - Hosted Runner Limits Wire Models
+
+private struct HostedRunnerLimitsResponse: Decodable {
+    let publicIps: PublicIPLimit?
+
+    enum CodingKeys: String, CodingKey {
+        case publicIps = "public_ips"
+    }
+}
+
+private struct PublicIPLimit: Decodable {
+    let maximum: Int
+    let currentUsage: Int
+
+    enum CodingKeys: String, CodingKey {
+        case maximum
+        case currentUsage = "current_usage"
     }
 }
