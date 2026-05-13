@@ -114,6 +114,8 @@ public struct ActionsOrgSnapshot: Sendable, Equatable, Identifiable {
     public let isOrg: Bool
     public let minutesUsed: Int?
     public let minutesIncluded: Int?
+    public let cacheUsage: ActionsCacheUsage?
+    public let artifactRetention: ArtifactRetentionPolicy?
 
     public var id: String { self.org }
 
@@ -124,7 +126,9 @@ public struct ActionsOrgSnapshot: Sendable, Equatable, Identifiable {
         planTier: GitHubPlanTier,
         isOrg: Bool = true,
         minutesUsed: Int? = nil,
-        minutesIncluded: Int? = nil
+        minutesIncluded: Int? = nil,
+        cacheUsage: ActionsCacheUsage? = nil,
+        artifactRetention: ArtifactRetentionPolicy? = nil
     ) {
         self.org = org
         self.runners = runners
@@ -133,6 +137,8 @@ public struct ActionsOrgSnapshot: Sendable, Equatable, Identifiable {
         self.isOrg = isOrg
         self.minutesUsed = minutesUsed
         self.minutesIncluded = minutesIncluded
+        self.cacheUsage = cacheUsage
+        self.artifactRetention = artifactRetention
     }
 
     public var hasRunners: Bool {
@@ -298,6 +304,38 @@ public struct ActionsQueueStatus: Sendable, Equatable {
     }
 
     public var totalActiveCount: Int { self.inProgressCount + self.queuedCount }
+}
+
+// MARK: - Actions Cache Usage
+
+public struct ActionsCacheUsage: Sendable, Equatable {
+    public let totalCachesCount: Int
+    public let totalCachesSizeBytes: Int
+
+    public init(totalCachesCount: Int, totalCachesSizeBytes: Int) {
+        self.totalCachesCount = totalCachesCount
+        self.totalCachesSizeBytes = totalCachesSizeBytes
+    }
+
+    public var cacheSizeMB: Double {
+        Double(self.totalCachesSizeBytes) / (1024 * 1024)
+    }
+
+    public var cacheSizeGB: Double {
+        Double(self.totalCachesSizeBytes) / (1024 * 1024 * 1024)
+    }
+}
+
+// MARK: - Artifact Retention Policy
+
+public struct ArtifactRetentionPolicy: Sendable, Equatable {
+    public let retentionDays: Int
+    public let maxAllowedDays: Int
+
+    public init(retentionDays: Int, maxAllowedDays: Int) {
+        self.retentionDays = retentionDays
+        self.maxAllowedDays = maxAllowedDays
+    }
 }
 
 // MARK: - Hosted Runner Limits

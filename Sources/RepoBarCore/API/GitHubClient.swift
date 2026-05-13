@@ -326,6 +326,14 @@ public actor GitHubClient {
         try await self.restAPI.hostedRunnerLimits(org: org)
     }
 
+    public func actionsCacheUsage(org: String) async throws -> ActionsCacheUsage {
+        try await self.restAPI.actionsCacheUsage(org: org)
+    }
+
+    public func artifactRetentionPolicy(org: String) async throws -> ArtifactRetentionPolicy {
+        try await self.restAPI.artifactRetentionPolicy(org: org)
+    }
+
     public func clearCache() async {
         await self.requestRunner.clear()
         self.prefetchedRepos = []

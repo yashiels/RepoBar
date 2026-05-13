@@ -826,6 +826,42 @@ struct GitHubRestAPI {
         return HostedRunnerLimits(publicIPs: publicIPs, fetchedAt: now)
     }
 
+    // MARK: - Actions Cache Usage
+
+    func actionsCacheUsage(org: String) async throws -> ActionsCacheUsage {
+        let token = try await tokenProvider()
+        let baseURL = await apiHost()
+        let (data, _) = try await authorizedGet(
+            url: baseURL.appending(path: "/orgs/\(org)/actions/cache/usage"),
+            token: token,
+            allowedStatuses: [200, 304],
+            useETag: false
+        )
+        let decoded = try GitHubDecoding.decode(ActionsCacheUsageResponse.self, from: data)
+        return ActionsCacheUsage(
+            totalCachesCount: decoded.totalActiveCachesCount,
+            totalCachesSizeBytes: decoded.totalActiveCachesSizeInBytes
+        )
+    }
+
+    // MARK: - Artifact Retention Policy
+
+    func artifactRetentionPolicy(org: String) async throws -> ArtifactRetentionPolicy {
+        let token = try await tokenProvider()
+        let baseURL = await apiHost()
+        let (data, _) = try await authorizedGet(
+            url: baseURL.appending(path: "/orgs/\(org)/actions/permissions/artifact-and-log-retention"),
+            token: token,
+            allowedStatuses: [200, 304, 404],
+            useETag: false
+        )
+        let decoded = try GitHubDecoding.decode(ArtifactRetentionResponse.self, from: data)
+        return ArtifactRetentionPolicy(
+            retentionDays: decoded.days,
+            maxAllowedDays: decoded.maximumAllowedDays
+        )
+    }
+
     private func actionsRunsURL(baseURL: URL, owner: String, name: String, status: String) -> URL {
         var components = URLComponents(
             url: baseURL.appending(path: "/repos/\(owner)/\(name)/actions/runs"),
@@ -977,5 +1013,29 @@ private struct PublicIPLimit: Decodable {
     enum CodingKeys: String, CodingKey {
         case maximum
         case currentUsage = "current_usage"
+    }
+}
+
+// MARK: - Actions Cache Usage Wire Models
+
+private struct ActionsCacheUsageResponse: Decodable {
+    let totalActiveCachesCount: Int
+    let totalActiveCachesSizeInBytes: Int
+
+    enum CodingKeys: String, CodingKey {
+        case totalActiveCachesCount = "total_active_caches_count"
+        case totalActiveCachesSizeInBytes = "total_active_caches_size_in_bytes"
+    }
+}
+
+// MARK: - Artifact Retention Policy Wire Models
+
+private struct ArtifactRetentionResponse: Decodable {
+    let days: Int
+    let maximumAllowedDays: Int
+
+    enum CodingKeys: String, CodingKey {
+        case days
+        case maximumAllowedDays = "maximum_allowed_days"
     }
 }
