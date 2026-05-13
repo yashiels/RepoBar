@@ -18,6 +18,7 @@ public struct UserSettings: Equatable, Codable {
     public var enterpriseHost: URL?
     public var loopbackPort: Int = 53682
     public var authMethod: AuthMethod = .oauth
+    public var actions = ActionsSettings()
 
     public init() {}
 
@@ -40,6 +41,7 @@ public struct UserSettings: Equatable, Codable {
         case enterpriseHost
         case loopbackPort
         case authMethod
+        case actions
     }
 
     public init(from decoder: Decoder) throws {
@@ -63,6 +65,7 @@ public struct UserSettings: Equatable, Codable {
         self.enterpriseHost = try container.decodeIfPresent(URL.self, forKey: .enterpriseHost)
         self.loopbackPort = try container.decodeIfPresent(Int.self, forKey: .loopbackPort) ?? 53682
         self.authMethod = try container.decodeIfPresent(AuthMethod.self, forKey: .authMethod) ?? .oauth
+        self.actions = try container.decodeIfPresent(ActionsSettings.self, forKey: .actions) ?? ActionsSettings()
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -84,7 +87,16 @@ public struct UserSettings: Equatable, Codable {
         try container.encodeIfPresent(self.enterpriseHost, forKey: .enterpriseHost)
         try container.encode(self.loopbackPort, forKey: .loopbackPort)
         try container.encode(self.authMethod, forKey: .authMethod)
+        try container.encode(self.actions, forKey: .actions)
     }
+}
+
+public struct ActionsSettings: Equatable, Codable {
+    public var planTier: GitHubPlanTier = .free
+    public var showActionsInMenu: Bool = true
+    public var monitoredOrg: String?
+
+    public init() {}
 }
 
 public enum AuthMethod: String, CaseIterable, Equatable, Codable, Sendable {

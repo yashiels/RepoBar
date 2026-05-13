@@ -15,6 +15,7 @@ public enum MainMenuItemID: String, CaseIterable, Codable, Hashable, Sendable {
     case contributionHeader
     case statusBanner
     case rateLimits
+    case actionsLimits
     case filters
     case repoList
     case issueNavigator
@@ -30,6 +31,7 @@ public enum MainMenuItemID: String, CaseIterable, Codable, Hashable, Sendable {
         case .contributionHeader: "Contribution Header"
         case .statusBanner: "Status Banner"
         case .rateLimits: "GitHub API Status"
+        case .actionsLimits: "Actions & Runners"
         case .filters: "Menu Filters"
         case .repoList: "Repository Cards"
         case .issueNavigator: "Issue Navigator"
@@ -47,6 +49,7 @@ public enum MainMenuItemID: String, CaseIterable, Codable, Hashable, Sendable {
         case .contributionHeader: "Heatmap header + submenu"
         case .statusBanner: "Rate-limit or error banner"
         case .rateLimits: "Current blocker and rate-limit diagnostics"
+        case .actionsLimits: "Runner status, queue depth, and usage"
         case .filters: "Pinned/hidden filter chips"
         case .repoList: "Repo cards + inline heatmap"
         case .issueNavigator: "Fast issue and pull request search"
@@ -61,7 +64,7 @@ public enum MainMenuItemID: String, CaseIterable, Codable, Hashable, Sendable {
         switch self {
         case .loggedOutPrompt, .signInAction: .auth
         case .contributionHeader: .header
-        case .statusBanner, .rateLimits: .status
+        case .statusBanner, .rateLimits, .actionsLimits: .status
         case .filters: .filters
         case .repoList: .repos
         case .issueNavigator, .preferences, .about, .restartToUpdate, .quit: .footer
@@ -183,6 +186,7 @@ public struct MenuCustomization: Equatable, Codable, Hashable, Sendable {
         let originalRepoOrder = self.repoSubmenuOrder
         self.mainMenuOrder = Self.normalizedOrder(self.mainMenuOrder, defaults: Self.defaultMainMenuOrder)
         Self.moveMainMenuItem(.rateLimits, after: .statusBanner, in: &self.mainMenuOrder)
+        Self.moveMainMenuItem(.actionsLimits, after: .rateLimits, in: &self.mainMenuOrder)
         self.repoSubmenuOrder = Self.normalizedOrder(self.repoSubmenuOrder, defaults: Self.defaultRepoSubmenuOrder)
         if originalRepoOrder.contains(.changelog) == false {
             self.repoSubmenuOrder.removeAll { $0 == .changelog }
@@ -212,6 +216,7 @@ public struct MenuCustomization: Equatable, Codable, Hashable, Sendable {
         .contributionHeader,
         .statusBanner,
         .rateLimits,
+        .actionsLimits,
         .filters,
         .repoList,
         .issueNavigator,
