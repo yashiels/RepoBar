@@ -19,6 +19,7 @@ struct MenuBuildSignature: Hashable {
     let heatmapRangeStart: TimeInterval
     let heatmapRangeEnd: TimeInterval
     let reposDigest: Int
+    let actionsDigest: Int
     let timeBucket: Int
 }
 
@@ -122,6 +123,40 @@ struct ActiveRateLimitSignature: Hashable {
         self.remaining = row.remaining
         self.reset = row.resetAt
         self.lastError = row.lastError
+    }
+}
+
+struct ActionsSnapshotSignature: Hashable {
+    let org: String
+    let planTier: GitHubPlanTier
+    let isOrg: Bool
+    let minutesUsed: Int?
+    let minutesIncluded: Int?
+    let runnerCount: Int
+    let onlineRunners: Int
+    let busyRunners: Int
+    let inProgressJobs: Int
+    let queuedJobs: Int
+    let runIDs: [Int]
+
+    init(_ snapshot: ActionsOrgSnapshot) {
+        self.org = snapshot.org
+        self.planTier = snapshot.planTier
+        self.isOrg = snapshot.isOrg
+        self.minutesUsed = snapshot.minutesUsed
+        self.minutesIncluded = snapshot.minutesIncluded
+        self.runnerCount = snapshot.runners?.totalCount ?? 0
+        self.onlineRunners = snapshot.runners?.onlineCount ?? 0
+        self.busyRunners = snapshot.runners?.busyCount ?? 0
+        self.inProgressJobs = snapshot.queueStatus?.inProgressCount ?? 0
+        self.queuedJobs = snapshot.queueStatus?.queuedCount ?? 0
+        self.runIDs = snapshot.queueStatus?.runs.map(\.id) ?? []
+    }
+
+    static func digest(for snapshots: [ActionsOrgSnapshot]) -> Int {
+        var hasher = Hasher()
+        snapshots.map(Self.init).forEach { hasher.combine($0) }
+        return hasher.finalize()
     }
 }
 

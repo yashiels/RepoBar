@@ -206,6 +206,13 @@ final class StatusBarMenuManager: NSObject, NSMenuDelegate {
             let plan = self.menuBuilder.mainMenuPlan()
             guard self.lastMainMenuSignature != plan.signature else { return }
 
+            // Don't tear down and rebuild menu items while the menu is visible —
+            // replacing NSHostingViews under an open NSMenu can deadlock WindowServer.
+            if menu.items.compactMap(\.view).first?.window != nil {
+                self.lastMainMenuSignature = nil
+                return
+            }
+
             self.recentListCoordinator.pruneMenus()
             self.localGitMenuCoordinator.pruneMenus()
             self.changelogMenuCoordinator.pruneMenus()
