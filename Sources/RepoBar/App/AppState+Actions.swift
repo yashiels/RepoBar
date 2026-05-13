@@ -52,6 +52,8 @@ extension AppState {
             let billingUsage = try? await github.actionsBillingUsage(owner: owner.name, isOrg: owner.isOrg)
             let minutesUsed = billingUsage.map { Int($0.minutesUsedInCurrentMonth().rounded()) }
             let minutesIncluded = ownerTier.includedMinutesPerMonth
+            let cacheUsage = owner.isOrg ? (try? await github.actionsCacheUsage(org: owner.name)) : nil
+            let artifactRetention = owner.isOrg ? (try? await github.artifactRetentionPolicy(org: owner.name)) : nil
 
             snapshots.append(ActionsOrgSnapshot(
                 org: owner.name,
@@ -60,7 +62,9 @@ extension AppState {
                 planTier: ownerTier,
                 isOrg: owner.isOrg,
                 minutesUsed: minutesUsed,
-                minutesIncluded: minutesIncluded
+                minutesIncluded: minutesIncluded,
+                cacheUsage: cacheUsage,
+                artifactRetention: artifactRetention
             ))
         }
 

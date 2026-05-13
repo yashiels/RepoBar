@@ -212,27 +212,20 @@ extension StatusBarMenuBuilder {
                     for: ActionsQueueRowView(queueStatus: queueStatus, planTier: tier),
                     enabled: false
                 ))
-                if !queueStatus.runs.isEmpty {
-                    submenu.addItem(self.viewItem(
-                        for: ActionsSectionHeaderView(title: "Active Workflow Runs"),
-                        enabled: false
-                    ))
-                    for run in queueStatus.runs.prefix(20) {
-                        let view = ActionsWorkflowRunRowView(run: run)
-                        if let url = run.htmlURL {
-                            let item = self.viewItem(for: view, enabled: true, highlightable: true)
-                            item.representedObject = url
-                            item.target = self.target
-                            item.action = #selector(self.target.openURLItem(_:))
-                            submenu.addItem(item)
-                        } else {
-                            submenu.addItem(self.viewItem(for: view, enabled: false))
-                        }
-                    }
-                    if queueStatus.runs.count > 20 {
-                        submenu.addItem(self.infoItem("… and \(queueStatus.runs.count - 20) more"))
-                    }
-                }
+            }
+
+            if let cache = snapshot.cacheUsage {
+                submenu.addItem(self.viewItem(
+                    for: ActionsCacheUsageRowView(cacheUsage: cache),
+                    enabled: false
+                ))
+            }
+
+            if let retention = snapshot.artifactRetention {
+                submenu.addItem(self.viewItem(
+                    for: ArtifactRetentionRowView(retention: retention),
+                    enabled: false
+                ))
             }
 
             if let runners = snapshot.runners, runners.totalCount > 0 {

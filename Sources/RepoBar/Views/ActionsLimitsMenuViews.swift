@@ -231,31 +231,56 @@ struct ActionsSectionHeaderView: View {
     }
 }
 
-struct ActionsWorkflowRunRowView: View {
-    let run: ActiveWorkflowRun
-    @Environment(\.menuItemHighlighted) private var isHighlighted
+// MARK: - Cache usage row
+
+struct ActionsCacheUsageRowView: View {
+    let cacheUsage: ActionsCacheUsage
 
     var body: some View {
-        HStack(alignment: .center, spacing: 8) {
-            Circle()
-                .fill(self.run.isRunning ? Color(nsColor: .systemGreen) : .orange)
-                .frame(width: 8, height: 8)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(self.run.name)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(MenuHighlightStyle.primary(self.isHighlighted))
-                    .lineLimit(1)
-                Text("\(self.run.repoName) · \(self.run.headBranch) · \(self.run.actor)")
-                    .font(.caption2)
-                    .foregroundStyle(MenuHighlightStyle.secondary(self.isHighlighted))
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 0)
+        HStack(spacing: 6) {
+            Image(systemName: "archivebox")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 14)
+            Text("Cache")
+                .font(.callout)
+            Spacer()
+            Text(Self.formatted(cacheUsage))
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, ActionsMenuMetrics.horizontalPadding)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 3)
+    }
+
+    private static func formatted(_ usage: ActionsCacheUsage) -> String {
+        let count = usage.totalCachesCount
+        if usage.cacheSizeGB >= 1.0 {
+            return String(format: "%d caches · %.1f GB", count, usage.cacheSizeGB)
+        }
+        return String(format: "%d caches · %.0f MB", count, usage.cacheSizeMB)
+    }
+}
+
+// MARK: - Artifact retention row
+
+struct ArtifactRetentionRowView: View {
+    let retention: ArtifactRetentionPolicy
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "clock.badge.checkmark")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 14)
+            Text("Artifact retention")
+                .font(.callout)
+            Spacer()
+            Text("\(retention.retentionDays) days")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 10)
         .padding(.vertical, 3)
     }
 }

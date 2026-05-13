@@ -138,6 +138,9 @@ struct ActionsSnapshotSignature: Hashable {
     let inProgressJobs: Int
     let queuedJobs: Int
     let runIDs: [Int]
+    let cacheSizeBytes: Int?
+    let cacheCount: Int?
+    let retentionDays: Int?
 
     init(_ snapshot: ActionsOrgSnapshot) {
         self.org = snapshot.org
@@ -151,6 +154,9 @@ struct ActionsSnapshotSignature: Hashable {
         self.inProgressJobs = snapshot.queueStatus?.inProgressCount ?? 0
         self.queuedJobs = snapshot.queueStatus?.queuedCount ?? 0
         self.runIDs = snapshot.queueStatus?.runs.map(\.id) ?? []
+        self.cacheSizeBytes = snapshot.cacheUsage?.totalCachesSizeBytes
+        self.cacheCount = snapshot.cacheUsage?.totalCachesCount
+        self.retentionDays = snapshot.artifactRetention?.retentionDays
     }
 
     static func digest(for snapshots: [ActionsOrgSnapshot]) -> Int {
