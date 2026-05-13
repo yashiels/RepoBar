@@ -3,9 +3,6 @@ import AppKit
 @MainActor
 enum RateLimitStatusIconRenderer {
     private static let outputSize = NSSize(width: 18, height: 18)
-    private static let outputScale: CGFloat = 2
-    private static let canvasPx = Int(outputSize.width * outputScale)
-    private static let grid = PixelGrid(scale: outputScale)
     private static var cache: [CacheKey: NSImage] = [:]
 
     static func makeIcon(restPercent: Double?, graphQLPercent: Double?) -> NSImage {
@@ -22,115 +19,72 @@ enum RateLimitStatusIconRenderer {
         NSBezierPath(rect: CGRect(origin: .zero, size: Self.outputSize)).fill()
 
         let baseFill = NSColor.labelColor
-        if graphQLPercent == nil {
-            Self.drawBar(
-                rectPx: RectPx(x: (Self.canvasPx - 30) / 2, y: 11, w: 30, h: 14),
-                percent: restPercent,
-                baseFill: baseFill,
-                trackFillAlpha: 0.26,
-                trackStrokeAlpha: 0.44
-            )
-            image.isTemplate = true
-            self.cache[key] = image
-            return image
-        }
-
-        Self.drawBar(
-            rectPx: RectPx(x: (Self.canvasPx - 30) / 2, y: 20, w: 30, h: 10),
-            percent: restPercent,
-            baseFill: baseFill,
-            trackFillAlpha: 0.26,
-            trackStrokeAlpha: 0.44
-        )
-        Self.drawBar(
-            rectPx: RectPx(x: (Self.canvasPx - 30) / 2, y: 7, w: 30, h: 8),
-            percent: graphQLPercent,
-            baseFill: baseFill,
-            trackFillAlpha: 0.22,
-            trackStrokeAlpha: 0.38
-        )
+        Self.drawRestRing(percent: restPercent, baseFill: baseFill)
+        Self.drawGraphQLDot(percent: graphQLPercent, baseFill: baseFill)
 
         image.isTemplate = true
         self.cache[key] = image
         return image
     }
 
-    private static func drawBar(
-        rectPx: RectPx,
-        percent: Double?,
-        baseFill: NSColor,
-        trackFillAlpha: CGFloat,
-        trackStrokeAlpha: CGFloat
-    ) {
-        let rect = rectPx.rect()
-        let radius = Self.grid.pt(rectPx.h / 2)
-        let trackPath = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
-
-        baseFill.withAlphaComponent(trackFillAlpha).setFill()
-        trackPath.fill()
-
-        let strokeWidthPx = 2
-        let insetPx = strokeWidthPx / 2
-        let strokeRect = Self.grid.rect(
-            x: rectPx.x + insetPx,
-            y: rectPx.y + insetPx,
-            w: max(0, rectPx.w - insetPx * 2),
-            h: max(0, rectPx.h - insetPx * 2)
+    private static func drawRestRing(percent: Double?, baseFill: NSColor) {
+        let center = CGPoint(x: Self.outputSize.width / 2, y: Self.outputSize.height / 2)
+        let radius: CGFloat = 6.5
+        let lineWidth: CGFloat = 2.1
+        let trackRect = CGRect(
+            x: center.x - radius,
+            y: center.y - radius,
+            width: radius * 2,
+            height: radius * 2
         )
-        let strokePath = NSBezierPath(
-            roundedRect: strokeRect,
-            xRadius: Self.grid.pt(max(0, rectPx.h / 2 - insetPx)),
-            yRadius: Self.grid.pt(max(0, rectPx.h / 2 - insetPx))
-        )
-        strokePath.lineWidth = CGFloat(strokeWidthPx) / Self.outputScale
-        baseFill.withAlphaComponent(trackStrokeAlpha).setStroke()
-        strokePath.stroke()
+
+        let track = NSBezierPath(ovalIn: trackRect)
+        track.lineWidth = lineWidth
+        baseFill.withAlphaComponent(0.34).setStroke()
+        track.stroke()
 
         guard let percent else { return }
 
         let clamped = max(0, min(percent / 100, 1))
-        let fillWidthPx = max(0, min(rectPx.w, Int((CGFloat(rectPx.w) * CGFloat(clamped)).rounded())))
-        guard fillWidthPx > 0 else { return }
+        guard clamped > 0 else { return }
 
-        NSGraphicsContext.current?.cgContext.saveGState()
-        trackPath.addClip()
-        baseFill.setFill()
-        NSBezierPath(rect: Self.grid.rect(x: rectPx.x, y: rectPx.y, w: fillWidthPx, h: rectPx.h)).fill()
-        NSGraphicsContext.current?.cgContext.restoreGState()
+        let startAngle: CGFloat = 90
+        let endAngle = startAngle - (360 * CGFloat(clamped))
+        let progress = NSBezierPath()
+        progress.appendArc(
+            withCenter: center,
+            radius: radius,
+            startAngle: startAngle,
+            endAngle: endAngle,
+            clockwise: true
+        )
+        progress.lineWidth = lineWidth
+        progress.lineCapStyle = .round
+        baseFill.setStroke()
+        progress.stroke()
+    }
+
+    private static func drawGraphQLDot(percent: Double?, baseFill: NSColor) {
+        let dotSize: CGFloat = 4.4
+        let dotRect = CGRect(
+            x: (Self.outputSize.width - dotSize) / 2,
+            y: (Self.outputSize.height - dotSize) / 2,
+            width: dotSize,
+            height: dotSize
+        )
+        let dot = NSBezierPath(ovalIn: dotRect)
+        let alpha = percent.map { max(0.26, min(CGFloat($0 / 100), 1)) } ?? 0.28
+        baseFill.withAlphaComponent(alpha).setFill()
+        dot.fill()
     }
 
     private static func bucket(_ percent: Double?) -> Int {
         guard let percent else { return -1 }
-
         return Int(max(0, min(100, percent)).rounded())
     }
 
     private struct CacheKey: Hashable {
         let rest: Int
         let graphQL: Int
-    }
-
-    private struct PixelGrid {
-        let scale: CGFloat
-
-        func pt(_ px: Int) -> CGFloat {
-            CGFloat(px) / self.scale
-        }
-
-        func rect(x: Int, y: Int, w: Int, h: Int) -> CGRect {
-            CGRect(x: self.pt(x), y: self.pt(y), width: self.pt(w), height: self.pt(h))
-        }
-    }
-
-    private struct RectPx {
-        let x: Int
-        let y: Int
-        let w: Int
-        let h: Int
-
-        @MainActor
-        func rect() -> CGRect {
-            RateLimitStatusIconRenderer.grid.rect(x: self.x, y: self.y, w: self.w, h: self.h)
-        }
     }
 }

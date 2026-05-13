@@ -2,6 +2,7 @@
 
 ## 0.5.3 - Unreleased
 
+- Replace the menu bar GitHub rate-limit bar glyph with a circular quota meter so RepoBar is easier to distinguish from other menu bar apps.
 - Add a full Issue Navigator window for clipboard-aware issue/PR lookup, scoped repository search, keyboard selection, copy/open actions, and inline GitHub previews.
 - Show RepoBar in the Dock while the Issue Navigator window is open, then return to menu-bar-only mode when it closes.
 - Refine Issue Navigator sidebar chrome with a translucent material sidebar and subtler native split-view divider.
