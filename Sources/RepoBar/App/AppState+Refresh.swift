@@ -126,6 +126,7 @@ extension AppState {
             await self.updateMenuDisplayIndex(now: now)
             self.prefetchMenuTargets(from: final, visibleCount: targets.count, token: self.refreshTaskToken)
             await self.refreshRateLimitDisplayState()
+            await self.refreshActionsLimitsState()
             let message = await self.github.rateLimitMessage(now: now)
             await MainActor.run {
                 self.session.lastError = message

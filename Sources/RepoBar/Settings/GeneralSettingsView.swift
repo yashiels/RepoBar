@@ -109,6 +109,17 @@ struct GeneralSettingsView: View {
                 } footer: {
                     Text("Filters apply to repo lists and search. 'Show only my repositories' hides repos owned by organizations and other users.")
                 }
+
+                Section {
+                    Toggle("Show Actions & Runners in menu", isOn: self.$session.settings.actions.showActionsInMenu)
+                        .onChange(of: self.session.settings.actions.showActionsInMenu) { _, _ in
+                            self.appState.persistSettings()
+                        }
+                } header: {
+                    Text("Actions & Runners")
+                } footer: {
+                    Text("Shows workflow runs, concurrent job usage, and self-hosted runners per organization. Plans are auto-detected with a classic PAT.")
+                }
             }
             .formStyle(.grouped)
 
