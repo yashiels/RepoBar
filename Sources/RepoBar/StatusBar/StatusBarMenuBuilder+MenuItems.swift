@@ -158,6 +158,131 @@ extension StatusBarMenuBuilder {
         return submenu
     }
 
+    // MARK: - Actions & Runners
+
+    func actionsLimitsStatusMenuItem(now: Date = Date()) -> NSMenuItem {
+        let session = self.appState.session
+        let summary = Self.actionsCompactSummary(session: session)
+        let hasRunners = session.actionsOrgSnapshots.contains { $0.runners?.onlineCount ?? 0 > 0 }
+        let view = ActionsLimitsStatusRowView(summary: summary, hasRunners: hasRunners)
+        return self.viewItem(
+            for: view,
+            enabled: true,
+            highlightable: true,
+            submenu: self.actionsLimitsSubmenu(session: session, now: now)
+        )
+    }
+
+    private func actionsLimitsSubmenu(session: Session, now: Date) -> NSMenu {
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        submenu.delegate = self.target
+
+        let snapshots = session.actionsOrgSnapshots
+        let showOrgHeaders = snapshots.count > 1
+
+        for (index, snapshot) in snapshots.enumerated() {
+            let tier = snapshot.planTier
+
+            if index > 0 {
+                submenu.addItem(.separator())
+            }
+
+            if showOrgHeaders {
+                submenu.addItem(self.viewItem(
+                    for: ActionsOrgHeaderView(org: snapshot.org, isOrg: snapshot.isOrg),
+                    enabled: false
+                ))
+            }
+
+            submenu.addItem(self.viewItem(
+                for: ActionsSectionHeaderView(title: "\(tier.label) Plan"),
+                enabled: false
+            ))
+
+            if let used = snapshot.minutesUsed, let included = snapshot.minutesIncluded {
+                submenu.addItem(self.viewItem(
+                    for: ActionsMinutesRowView(minutesUsed: used, minutesIncluded: included),
+                    enabled: false
+                ))
+            }
+
+            if let queueStatus = snapshot.queueStatus {
+                submenu.addItem(self.viewItem(
+                    for: ActionsQueueRowView(queueStatus: queueStatus, planTier: tier),
+                    enabled: false
+                ))
+                if !queueStatus.runs.isEmpty {
+                    submenu.addItem(self.viewItem(
+                        for: ActionsSectionHeaderView(title: "Active Workflow Runs"),
+                        enabled: false
+                    ))
+                    for run in queueStatus.runs.prefix(20) {
+                        let view = ActionsWorkflowRunRowView(run: run)
+                        if let url = run.htmlURL {
+                            let item = self.viewItem(for: view, enabled: true, highlightable: true)
+                            item.representedObject = url
+                            item.target = self.target
+                            item.action = #selector(self.target.openURLItem(_:))
+                            submenu.addItem(item)
+                        } else {
+                            submenu.addItem(self.viewItem(for: view, enabled: false))
+                        }
+                    }
+                    if queueStatus.runs.count > 20 {
+                        submenu.addItem(self.infoItem("… and \(queueStatus.runs.count - 20) more"))
+                    }
+                }
+            }
+
+            if let runners = snapshot.runners, runners.totalCount > 0 {
+                submenu.addItem(self.viewItem(
+                    for: ActionsRunnerFleetRowView(runners: runners),
+                    enabled: false
+                ))
+
+                for runner in runners.runners.prefix(10) {
+                    submenu.addItem(self.viewItem(
+                        for: ActionsRunnerRowView(runner: runner),
+                        enabled: false
+                    ))
+                }
+                if runners.totalCount > 10 {
+                    submenu.addItem(self.infoItem("… and \(runners.totalCount - 10) more"))
+                }
+            }
+
+            if !snapshot.hasRunners && !snapshot.hasActiveJobs {
+                submenu.addItem(self.infoItem("No active runners or jobs"))
+            }
+        }
+
+        if snapshots.isEmpty {
+            submenu.addItem(self.infoItem("No organizations found"))
+        }
+
+        return submenu
+    }
+
+    private static func actionsCompactSummary(session: Session) -> String {
+        let snapshots = session.actionsOrgSnapshots
+        let totalRunners = snapshots.compactMap(\.runners).reduce(0) { $0 + $1.totalCount }
+        let onlineRunners = snapshots.compactMap(\.runners).reduce(0) { $0 + $1.onlineCount }
+        let activeJobs = snapshots.compactMap(\.queueStatus).reduce(0) { $0 + $1.totalActiveCount }
+
+        var parts: [String] = []
+        if totalRunners > 0 {
+            parts.append("\(onlineRunners)/\(totalRunners) runners")
+        }
+        if activeJobs > 0 {
+            parts.append("\(activeJobs) jobs active")
+        }
+        if parts.isEmpty {
+            parts.append("\(snapshots.count) org\(snapshots.count == 1 ? "" : "s")")
+        }
+        return parts.joined(separator: " · ")
+    }
+
     func actionItem(
         title: String,
         action: Selector,
