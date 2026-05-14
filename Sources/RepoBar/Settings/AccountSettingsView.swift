@@ -11,6 +11,7 @@ struct AccountSettingsView: View {
     @State private var hostMode: HostMode = .githubCom
     @State private var authMethod: AuthMethod = .oauth
     @State private var patInput = ""
+    @State private var monitoredOwnersDraft = ""
     @State private var isValidatingPAT = false
     @State private var validationError: String?
     @State private var tokenValidation: TokenValidationState = .unknown
@@ -175,6 +176,57 @@ struct AccountSettingsView: View {
                 }
             }
 
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        TextField("Add owner", text: self.$monitoredOwnersDraft)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit { self.addMonitoredOwners() }
+                        Button("Add") { self.addMonitoredOwners() }
+                            .disabled(Self.parseOwners(self.monitoredOwnersDraft).isEmpty)
+                        Button("Use Visible") { self.useVisibleOwners() }
+                            .disabled(self.visibleOwnerCandidates.isEmpty)
+                        Button("Auto") { self.clearMonitoredOwners() }
+                            .disabled(self.selectedMonitoredOwners.isEmpty)
+                    }
+
+                    VStack(spacing: 0) {
+                        if self.selectedMonitoredOwners.isEmpty {
+                            self.monitoredOwnerRow(
+                                title: "Auto",
+                                subtitle: "Personal account plus visible repository owners",
+                                systemImage: "wand.and.stars",
+                                removeAction: nil
+                            )
+                        } else {
+                            ForEach(Array(self.selectedMonitoredOwners.enumerated()), id: \.element) { index, owner in
+                                if index > 0 {
+                                    Divider()
+                                }
+                                self.monitoredOwnerRow(
+                                    title: owner,
+                                    subtitle: self.monitoredOwnerSubtitle(owner),
+                                    systemImage: self.monitoredOwnerIcon(owner),
+                                    removeAction: { self.removeMonitoredOwner(owner) }
+                                )
+                            }
+                        }
+                    }
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(nsColor: .textBackgroundColor).opacity(0.35))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                    )
+                }
+            } header: {
+                Text("Monitored Owners")
+            } footer: {
+                Text("Owners control which accounts RepoBar uses for Actions & Runners. Auto follows your personal account and visible repository owners.")
+            }
+
             if let validationError {
                 Text(validationError)
                     .font(.caption)
@@ -205,6 +257,7 @@ struct AccountSettingsView: View {
                 }
             }
             self.authMethod = self.session.settings.authMethod
+            self.monitoredOwnersDraft = ""
         }
         .task(id: self.session.account) {
             guard case .loggedIn = self.session.account else {
@@ -214,6 +267,107 @@ struct AccountSettingsView: View {
 
             await self.validateToken()
         }
+    }
+
+    private var visibleOwnerCandidates: [String] {
+        var owners = self.session.repositories.map(\.owner)
+        if case let .loggedIn(user) = self.session.account {
+            owners.append(user.username)
+        }
+        return OwnerFilter.normalize(owners)
+    }
+
+    private var selectedMonitoredOwners: [String] {
+        OwnerFilter.normalize(self.session.settings.monitoredOwners)
+    }
+
+    private func addMonitoredOwners() {
+        let owners = Self.parseOwners(self.monitoredOwnersDraft)
+        guard !owners.isEmpty else { return }
+
+        self.session.settings.monitoredOwners = OwnerFilter.normalize(self.selectedMonitoredOwners + owners)
+        self.monitoredOwnersDraft = ""
+        self.monitoredOwnersChanged()
+    }
+
+    private func useVisibleOwners() {
+        self.session.settings.monitoredOwners = self.visibleOwnerCandidates
+        self.monitoredOwnersDraft = ""
+        self.monitoredOwnersChanged()
+    }
+
+    private func clearMonitoredOwners() {
+        self.session.settings.monitoredOwners = []
+        self.monitoredOwnersDraft = ""
+        self.monitoredOwnersChanged()
+    }
+
+    private func removeMonitoredOwner(_ owner: String) {
+        let normalized = owner.lowercased()
+        self.session.settings.monitoredOwners = self.selectedMonitoredOwners.filter { $0 != normalized }
+        self.monitoredOwnersChanged()
+    }
+
+    private func monitoredOwnersChanged() {
+        self.appState.persistSettings()
+        if !self.session.settings.menuCustomization.hiddenMainMenuItems.contains(.actionsLimits) {
+            self.session.actionsOrgSnapshots = []
+            NotificationCenter.default.post(name: .menuRepositoriesDidChange, object: nil)
+            self.appState.requestRefresh(cancelInFlight: true)
+        }
+    }
+
+    private static func parseOwners(_ rawValue: String) -> [String] {
+        OwnerFilter.normalize(rawValue.split { separator in
+            separator == "," || separator == " " || separator == "\n" || separator == "\t"
+        }.map(String.init))
+    }
+
+    private func monitoredOwnerIcon(_ owner: String) -> String {
+        guard case let .loggedIn(user) = self.session.account,
+              owner == user.username.lowercased()
+        else { return "building.2" }
+
+        return "person.crop.circle"
+    }
+
+    private func monitoredOwnerSubtitle(_ owner: String) -> String {
+        guard case let .loggedIn(user) = self.session.account,
+              owner == user.username.lowercased()
+        else { return "Pinned owner" }
+
+        return "Personal account"
+    }
+
+    private func monitoredOwnerRow(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        removeAction: (() -> Void)?
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: systemImage)
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.body.weight(.medium))
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            if let removeAction {
+                Button(action: removeAction) {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help("Remove owner")
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
     }
 
     private func login() {
