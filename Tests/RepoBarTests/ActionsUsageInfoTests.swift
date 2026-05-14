@@ -70,6 +70,20 @@ struct ActionsUsageInfoTests {
         #expect(status.repositorySampleDescription == "Sampled 5 of 9 repos")
     }
 
+    @Test
+    func `runner repository sample description appears for sampled personal repos`() {
+        let runners = ActionsRunnerInfo(
+            totalCount: 0,
+            runners: [],
+            fetchedAt: Self.date("2026-05-14T12:00:00Z"),
+            scannedRepositoryCount: 5,
+            totalRepositoryCount: 8
+        )
+
+        #expect(runners.isRepositorySampled)
+        #expect(runners.repositorySampleDescription == "Sampled 5 of 8 repos")
+    }
+
     private static func item(date: String, quantity: Double, unitType: String = "minutes") -> ActionsUsageItem {
         ActionsUsageItem(
             date: date,

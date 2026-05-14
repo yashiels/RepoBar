@@ -136,6 +136,8 @@ struct ActionsSnapshotSignature: Hashable {
     let onlineRunners: Int
     let busyRunners: Int
     let displayedRunners: [DisplayedRunnerSignature]
+    let runnerScannedRepositoryCount: Int
+    let runnerTotalRepositoryCount: Int
     let inProgressJobs: Int
     let queuedJobs: Int
     let runIDs: [Int]
@@ -153,6 +155,8 @@ struct ActionsSnapshotSignature: Hashable {
         self.onlineRunners = snapshot.runners?.onlineCount ?? 0
         self.busyRunners = snapshot.runners?.busyCount ?? 0
         self.displayedRunners = snapshot.runners?.runners.prefix(10).map(DisplayedRunnerSignature.init) ?? []
+        self.runnerScannedRepositoryCount = snapshot.runners?.scannedRepositoryCount ?? 0
+        self.runnerTotalRepositoryCount = snapshot.runners?.totalRepositoryCount ?? 0
         self.inProgressJobs = snapshot.queueStatus?.inProgressCount ?? 0
         self.queuedJobs = snapshot.queueStatus?.queuedCount ?? 0
         self.runIDs = snapshot.queueStatus?.runs.map(\.id) ?? []

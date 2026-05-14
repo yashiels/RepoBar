@@ -172,11 +172,21 @@ public struct ActionsRunnerInfo: Sendable, Equatable {
     public let totalCount: Int
     public let runners: [RunnerSummary]
     public let fetchedAt: Date
+    public let scannedRepositoryCount: Int
+    public let totalRepositoryCount: Int
 
-    public init(totalCount: Int, runners: [RunnerSummary], fetchedAt: Date) {
+    public init(
+        totalCount: Int,
+        runners: [RunnerSummary],
+        fetchedAt: Date,
+        scannedRepositoryCount: Int = 0,
+        totalRepositoryCount: Int = 0
+    ) {
         self.totalCount = totalCount
         self.runners = runners
         self.fetchedAt = fetchedAt
+        self.scannedRepositoryCount = scannedRepositoryCount
+        self.totalRepositoryCount = totalRepositoryCount
     }
 
     public var onlineCount: Int {
@@ -193,6 +203,16 @@ public struct ActionsRunnerInfo: Sendable, Equatable {
 
     public var idleCount: Int {
         self.runners.count(where: { $0.status == "online" && !$0.busy })
+    }
+
+    public var isRepositorySampled: Bool {
+        self.totalRepositoryCount > self.scannedRepositoryCount && self.scannedRepositoryCount > 0
+    }
+
+    public var repositorySampleDescription: String? {
+        guard self.isRepositorySampled else { return nil }
+
+        return "Sampled \(self.scannedRepositoryCount) of \(self.totalRepositoryCount) repos"
     }
 }
 

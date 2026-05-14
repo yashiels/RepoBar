@@ -202,6 +202,13 @@ struct ActionsRunnerFleetRowView: View {
                 self.badge(count: self.runners.offlineCount, label: "offline", color: Color(nsColor: .systemRed))
                 Spacer(minLength: 0)
             }
+
+            if let repositorySampleDescription = self.runners.repositorySampleDescription {
+                Text(repositorySampleDescription)
+                    .font(.caption2)
+                    .foregroundStyle(MenuHighlightStyle.secondary(self.isHighlighted))
+                    .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, ActionsMenuMetrics.horizontalPadding)

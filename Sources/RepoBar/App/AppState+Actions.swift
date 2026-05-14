@@ -102,9 +102,32 @@ extension AppState {
         if let orgRunners = try? await github.selfHostedRunners(owner: owner) {
             return orgRunners
         }
-        guard let first = repos.first else { return nil }
+        guard !repos.isEmpty else { return nil }
 
-        return try? await github.selfHostedRunners(owner: first.owner, repo: first.name)
+        let sample = Array(repos.prefix(5))
+        var totalCount = 0
+        var runners: [RunnerSummary] = []
+        let now = Date()
+
+        for repo in sample {
+            guard let info = try? await github.selfHostedRunners(owner: repo.owner, repo: repo.name) else {
+                continue
+            }
+
+            totalCount += info.totalCount
+            runners.append(contentsOf: info.runners)
+        }
+
+        let isSampled = repos.count > sample.count
+        guard totalCount > 0 || isSampled else { return nil }
+
+        return ActionsRunnerInfo(
+            totalCount: totalCount,
+            runners: runners,
+            fetchedAt: now,
+            scannedRepositoryCount: sample.count,
+            totalRepositoryCount: repos.count
+        )
     }
 
     private static func fetchQueueStatus(

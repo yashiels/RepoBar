@@ -228,7 +228,7 @@ extension StatusBarMenuBuilder {
                 ))
             }
 
-            if let runners = snapshot.runners, runners.totalCount > 0 {
+            if let runners = snapshot.runners, runners.totalCount > 0 || runners.isRepositorySampled {
                 submenu.addItem(self.viewItem(
                     for: ActionsRunnerFleetRowView(runners: runners),
                     enabled: false
@@ -245,7 +245,8 @@ extension StatusBarMenuBuilder {
                 }
             }
 
-            if !snapshot.hasRunners, !snapshot.hasActiveJobs, snapshot.queueStatus?.isRepositorySampled != true {
+            let hasPartialRunnerOrQueueScan = snapshot.runners?.isRepositorySampled == true || snapshot.queueStatus?.isRepositorySampled == true
+            if !snapshot.hasRunners, !snapshot.hasActiveJobs, !hasPartialRunnerOrQueueScan {
                 submenu.addItem(self.infoItem("No active runners or jobs"))
             }
         }
