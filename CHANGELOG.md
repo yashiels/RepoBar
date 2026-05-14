@@ -18,6 +18,7 @@
 - Add an opt-in Actions & Runners menu section for GitHub Actions queue, billing usage, cache, retention, and runner status, with settings to pin the owners RepoBar monitors (thanks @yashiels).
 - Add opt-in GitHub pull request notifications for pinned repositories, with browser or Issue Navigator click handling (thanks @Whiteknight07).
 - Simplify GitHub Archives settings to accept one repository input while RepoBar manages derived labels and imported SQLite databases internally.
+- Harden RepoBar CLI validation and output for GitHub archives, local project roots, markdown images, settings, and copied GitHub references.
 - Open Issue Navigator wider by default so the GitHub preview has more usable space.
 - Fix RepoBar website mobile install cards so long commands and copy controls stay inline without horizontal overflow.
 

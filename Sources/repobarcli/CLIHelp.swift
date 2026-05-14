@@ -207,7 +207,7 @@ private func rootHelpText() -> String {
       repobar archives status [name] [--json] [--plain]
       repobar archives validate [name] [--json] [--plain]
       repobar archives update <name> [--json] [--plain]
-      repobar archives add <name> [--repo PATH] [--remote URL] [--branch BRANCH] [--db PATH] [--json] [--plain]
+      repobar archives add <repo|url|path|name> [--repo PATH|REPO|URL] [--remote URL] [--branch BRANCH] [--db PATH] [--json] [--plain]
       repobar archives remove <name> [--json] [--plain]
       repobar archives enable <name> [--json] [--plain]
       repobar archives disable <name> [--json] [--plain]
@@ -673,7 +673,7 @@ func printHelp(_ target: HelpTarget) {
         repobar archives add - add a GitHub archive source
 
         Usage:
-          repobar archives add <name> [--repo PATH] [--remote URL] [--branch BRANCH] [--db PATH] [--json] [--plain]
+          repobar archives add <repo|url|path|name> [--repo PATH|REPO|URL] [--remote URL] [--branch BRANCH] [--db PATH] [--json] [--plain]
         """
     case .archivesRemove:
         """

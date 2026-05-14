@@ -10,6 +10,7 @@ struct GitHubReferenceMonitorTests {
         #expect(GitHubReferenceTranslator.query(from: "7") == .issueNumber(7))
         #expect(GitHubReferenceTranslator.query(from: "#7") == .issueNumber(7))
         #expect(GitHubReferenceTranslator.query(from: "gh-42") == .issueNumber(42))
+        #expect(GitHubReferenceTranslator.query(from: "GH-42") == .issueNumber(42))
         #expect(GitHubReferenceTranslator.query(from: " #78096. ") == .issueNumber(78096))
         #expect(GitHubReferenceTranslator.query(from: "a73655") == nil)
     }
@@ -55,7 +56,15 @@ struct GitHubReferenceMonitorTests {
         )
         #expect(
             GitHubReferenceTranslator.query(from: " Discrawl#64. ") ==
-                .repositoryNameIssueNumber(repositoryName: "discrawl", number: 64)
+                .repositoryNameIssueNumber(repositoryName: "Discrawl", number: 64)
+        )
+        #expect(
+            GitHubReferenceTranslator.query(from: "steipete/RepoBar#66") ==
+                .repositoryIssueNumber(repositoryFullName: "steipete/RepoBar", number: 66)
+        )
+        #expect(
+            GitHubReferenceTranslator.query(from: "https://github.com/steipete/RepoBar/pull/66") ==
+                .repositoryIssueNumber(repositoryFullName: "steipete/RepoBar", number: 66)
         )
     }
 
@@ -137,6 +146,17 @@ struct GitHubReferenceMonitorTests {
             GitHubReferenceTranslator.query(from: "https://github.com/openclaw/openclaw/pull/57843/changes/d04517cefff3af339f560a8e388cacc3898e6562") ==
                 .repositoryCommitHash(repositoryFullName: "openclaw/openclaw", hash: "d04517cefff3af339f560a8e388cacc3898e6562")
         )
+    }
+
+    @Test
+    func `distinct commit hashes with shared display prefix remain distinct`() {
+        let first = "abcdef1234000000000000000000000000000000"
+        let second = "abcdef1234ffffffffffffffffffffffffffffff"
+
+        #expect(GitHubReferenceTranslator.queries(from: "commits \(first) \(second)") == [
+            .commitHash(first),
+            .commitHash(second)
+        ])
     }
 
     @Test

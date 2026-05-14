@@ -46,9 +46,9 @@ public enum GitHubReferenceTranslator {
         }
 
         var queries: [GitHubReferenceQuery] = []
-        var seen: Set<GitHubReferenceQuery> = []
+        var seen: Set<String> = []
         func append(_ query: GitHubReferenceQuery) {
-            guard seen.insert(query).inserted else { return }
+            guard seen.insert(self.dedupeKey(for: query)).inserted else { return }
 
             queries.append(query)
         }
@@ -101,10 +101,10 @@ public enum GitHubReferenceTranslator {
     ) -> [GitHubReferenceQuery] {
         let allowsNumericCommitHash = self.hasCommitContext(text)
         var queries: [GitHubReferenceQuery] = []
-        var seen: Set<GitHubReferenceQuery> = []
+        var seen: Set<String> = []
 
         func append(_ query: GitHubReferenceQuery) {
-            guard seen.insert(query).inserted else { return }
+            guard seen.insert(self.dedupeKey(for: query)).inserted else { return }
 
             queries.append(query)
         }
@@ -225,7 +225,7 @@ public enum GitHubReferenceTranslator {
             return namedIssue
         }
         if self.isCommitHash(token, allowNumericOnly: allowNumericCommitHash) {
-            return .commitHash(token)
+            return .commitHash(token.lowercased())
         }
         if let number = self.issueNumber(from: token, minimumBareDigits: minimumBareDigits, allowBareNumber: allowBareIssueNumber) {
             return .issueNumber(number)
@@ -290,7 +290,7 @@ public enum GitHubReferenceTranslator {
         if token.hasPrefix("#") {
             return Int(token.dropFirst())
         }
-        if token.hasPrefix("gh-") {
+        if token.lowercased().hasPrefix("gh-") {
             return Int(token.dropFirst(3))
         }
         guard allowBareNumber else { return nil }
@@ -423,7 +423,7 @@ public enum GitHubReferenceTranslator {
         guard tokens.indices.contains(index) else { return false }
         guard index > 0 else { return true }
 
-        let previous = tokens[index - 1]
+        let previous = tokens[index - 1].lowercased()
         return ["in", "repo", "repository", "from", "for", "on", "inside"].contains(previous)
     }
 
@@ -450,7 +450,6 @@ public enum GitHubReferenceTranslator {
         rawToken
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: ".,;:()[]{}<>\"'`"))
-            .lowercased()
     }
 
     private static func referenceTokens(in text: String) -> [String] {
@@ -464,6 +463,23 @@ public enum GitHubReferenceTranslator {
     private static func hasCommitContext(_ text: String) -> Bool {
         let normalized = text.lowercased()
         return normalized.contains("sha") || normalized.contains("commit") || normalized.contains("hash")
+    }
+
+    private static func dedupeKey(for query: GitHubReferenceQuery) -> String {
+        switch query {
+        case let .issueNumber(number):
+            "issue:\(number)"
+        case let .repositoryNameIssueNumber(repositoryName, number):
+            "repo-name:\(repositoryName.lowercased())#\(number)"
+        case let .repositoryIssueNumber(repositoryFullName, number):
+            "repo:\(repositoryFullName.lowercased())#\(number)"
+        case let .commitHash(hash):
+            "commit:\(hash.lowercased())"
+        case let .repositoryCommitHash(repositoryFullName, hash):
+            "repo:\(repositoryFullName.lowercased())@\(hash.lowercased())"
+        case let .repositoryWorkflowRun(repositoryFullName, runID):
+            "repo:\(repositoryFullName.lowercased())/run/\(runID)"
+        }
     }
 
     private static func isCommitHash(_ token: String, allowNumericOnly: Bool) -> Bool {

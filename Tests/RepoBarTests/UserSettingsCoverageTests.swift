@@ -89,6 +89,15 @@ struct UserSettingsCoverageTests {
     }
 
     @Test
+    func `default repo submenu order has no duplicates`() {
+        var seen = Set<RepoSubmenuItemID>()
+
+        for item in MenuCustomization.defaultRepoSubmenuOrder {
+            #expect(seen.insert(item).inserted)
+        }
+    }
+
+    @Test
     func `archive source derives internal fields from repo`() throws {
         let shorthand = try #require(GitHubArchiveStore.source(repository: "openclaw/archive"))
         #expect(shorthand.name == "openclaw/archive")

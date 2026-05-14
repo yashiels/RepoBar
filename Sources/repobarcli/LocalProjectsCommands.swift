@@ -44,6 +44,11 @@ struct LocalProjectsCommand: CommanderRunnableCommand {
         let rootPath = self.root
             ?? settings.localProjects.rootPath
             ?? "~/Projects"
+        let resolvedRoot = PathFormatter.expandTilde(rootPath)
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: resolvedRoot, isDirectory: &isDirectory), isDirectory.boolValue else {
+            throw ValidationError("Local projects root does not exist: \(PathFormatter.displayString(resolvedRoot))")
+        }
 
         let service = LocalProjectsService()
         let snapshot = await service.snapshot(
@@ -54,7 +59,6 @@ struct LocalProjectsCommand: CommanderRunnableCommand {
         )
 
         let displayRoot = PathFormatter.displayString(rootPath)
-        let resolvedRoot = PathFormatter.expandTilde(rootPath)
 
         let statuses = snapshot.statuses
         let syncedPaths = Set(snapshot.syncedStatuses.map(\.path.path))

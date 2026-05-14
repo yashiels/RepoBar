@@ -237,7 +237,6 @@ public struct MenuCustomization: Equatable, Codable, Hashable, Sendable {
         .issues,
         .pulls,
         .releases,
-        .changelog,
         .ciRuns,
         .discussions,
         .tags,

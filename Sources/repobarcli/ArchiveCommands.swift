@@ -197,7 +197,7 @@ struct ArchivesUpdateCommand: CommanderRunnableCommand {
 struct ArchivesAddCommand: CommanderRunnableCommand {
     nonisolated static let commandName = "archives-add"
 
-    @Option(name: .customLong("repo"), help: "Local Git snapshot repository path")
+    @Option(name: .customLong("repo"), help: "Repository shorthand, remote URL, or local Git snapshot repository path")
     var repoPath: String?
 
     @Option(name: .customLong("remote"), help: "Git snapshot remote URL")
@@ -212,7 +212,7 @@ struct ArchivesAddCommand: CommanderRunnableCommand {
     @OptionGroup
     var output: OutputOptions
 
-    private var name: String?
+    private var repository: String?
 
     static var commandDescription: CommandDescription {
         CommandDescription(commandName: commandName, abstract: "Add a GitHub archive source")
@@ -221,9 +221,9 @@ struct ArchivesAddCommand: CommanderRunnableCommand {
     mutating func bind(_ values: ParsedValues) throws {
         self.output.bind(values)
         if values.positional.count > 1 {
-            throw ValidationError("Only one archive name can be specified")
+            throw ValidationError("Only one archive repository can be specified")
         }
-        self.name = values.positional.first
+        self.repository = values.positional.first
         self.repoPath = try values.decodeOption("repoPath") ?? values.decodeOption("repo")
         self.remoteURL = try values.decodeOption("remoteURL") ?? values.decodeOption("remote")
         self.branch = try values.decodeOption("branch") ?? "main"
@@ -231,27 +231,22 @@ struct ArchivesAddCommand: CommanderRunnableCommand {
     }
 
     mutating func run() async throws {
-        guard let name = self.name?.trimmingCharacters(in: .whitespacesAndNewlines), name.isEmpty == false else {
-            throw ValidationError("Missing archive name")
-        }
-        guard self.repoPath != nil || self.remoteURL != nil else {
-            throw ValidationError("Archive needs --repo, --remote, or both")
-        }
-
         let store = SettingsStore()
         var settings = store.load()
-        if settings.githubArchives.sources.contains(where: { $0.name.equalsCaseInsensitive(name) }) {
-            throw ValidationError("Archive already exists: \(name)")
-        }
-
-        let dbPath = self.databasePath ?? Self.defaultDatabasePath(name: name)
-        let source = GitHubArchiveSource(
-            name: name,
-            localRepositoryPath: self.repoPath.map(PathFormatter.expandTilde),
+        let source = try Self.archiveSource(
+            repository: self.repository,
+            repoPath: self.repoPath,
             remoteURL: self.remoteURL,
             branch: self.branch,
-            importedDatabasePath: PathFormatter.expandTilde(dbPath)
+            databasePath: self.databasePath
         )
+        if settings.githubArchives.sources.contains(where: { $0.name.equalsCaseInsensitive(source.name) }) {
+            throw ValidationError("Archive already exists: \(source.name)")
+        }
+        if settings.githubArchives.sources.contains(where: { GitHubArchiveStore.sameArchiveLocation($0, source) }) {
+            throw ValidationError("Archive source already exists for this repository")
+        }
+
         settings.githubArchives.sources.append(source)
         store.save(settings)
         try self.render(action: "Added", source: source, settings: settings)
@@ -267,24 +262,102 @@ struct ArchivesAddCommand: CommanderRunnableCommand {
         print("db: \(PathFormatter.displayString(source.importedDatabasePath))")
     }
 
-    private static func defaultDatabasePath(name: String) -> String {
-        let safeName = name.lowercased().unicodeScalars.map { scalar in
-            CharacterSet.alphanumerics.contains(scalar)
-                || scalar == Unicode.Scalar("-")
-                || scalar == Unicode.Scalar("_")
-                ? Character(scalar)
-                : "-"
+    nonisolated static func archiveSource(
+        repository: String?,
+        repoPath: String?,
+        remoteURL: String?,
+        branch: String,
+        databasePath: String?,
+        fileManager: FileManager = .default
+    ) throws -> GitHubArchiveSource {
+        let sourceText = repository?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let repoText = repoPath?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let remoteText = remoteURL?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasExplicitLocation = repoText?.isEmpty == false || remoteText?.isEmpty == false
+        let baseRepository = (hasExplicitLocation ? [remoteText, repoText] : [sourceText])
+            .compactMap { value in value?.isEmpty == false ? value : nil }
+            .first
+        guard let baseRepository else {
+            throw ValidationError("Missing archive repository")
         }
-        let fileName = String(safeName).trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-        let base = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first?
-            .appending(path: "RepoBar", directoryHint: .isDirectory)
-            .appending(path: "Archives", directoryHint: .isDirectory)
-            .appending(path: "\(fileName.isEmpty ? "archive" : fileName).sqlite", directoryHint: .notDirectory)
-            .path
+        guard var source = GitHubArchiveStore.source(repository: baseRepository) else {
+            throw ValidationError("Invalid archive repository: \(baseRepository)")
+        }
 
-        return base ?? "~/Library/Application Support/RepoBar/Archives/\(fileName.isEmpty ? "archive" : fileName).sqlite"
+        let usesCustomName = hasExplicitLocation && sourceText?.isEmpty == false
+        if usesCustomName, let sourceText {
+            source.name = sourceText
+        }
+
+        if let repoText, repoText.isEmpty == false {
+            if remoteText?.isEmpty == false || GitHubArchiveStore.normalizedRemoteURL(repository: repoText) == nil {
+                source.localRepositoryPath = PathFormatter.expandTilde(repoText)
+            }
+        }
+        if let remoteText, remoteText.isEmpty == false {
+            source.remoteURL = try self.validatedRemote(remoteText)
+        }
+        source.branch = branch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "main" : branch
+        if let databasePath, databasePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            source.importedDatabasePath = PathFormatter.expandTilde(databasePath)
+        } else if usesCustomName {
+            source.importedDatabasePath = GitHubArchiveStore.defaultDatabasePath(
+                name: source.name,
+                repositoryIdentifier: source.remoteURL ?? source.localRepositoryPath
+            )
+        }
+
+        if let localRepositoryPath = source.localRepositoryPath {
+            try self.validateLocalRepositoryPath(
+                localRepositoryPath,
+                allowRemoteCloneTarget: source.remoteURL?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false,
+                fileManager: fileManager
+            )
+        }
+        if let remoteURL = source.remoteURL {
+            _ = try self.validatedRemote(remoteURL)
+        }
+        return source
+    }
+
+    private nonisolated static func validateLocalRepositoryPath(
+        _ path: String,
+        allowRemoteCloneTarget: Bool,
+        fileManager: FileManager
+    ) throws {
+        let expanded = PathFormatter.expandTilde(path)
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: expanded, isDirectory: &isDirectory), isDirectory.boolValue else {
+            if allowRemoteCloneTarget {
+                return
+            }
+            throw ValidationError("Archive repository path does not exist: \(PathFormatter.displayString(expanded))")
+        }
+
+        let gitPath = URL(fileURLWithPath: expanded).appending(path: ".git").path
+        guard allowRemoteCloneTarget || fileManager.fileExists(atPath: gitPath) else {
+            throw ValidationError("Archive repository path is not a Git working tree: \(PathFormatter.displayString(expanded))")
+        }
+    }
+
+    private nonisolated static func validatedRemote(_ remote: String) throws -> String {
+        let trimmed = remote.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else {
+            throw ValidationError("Archive remote URL is empty")
+        }
+
+        if trimmed.hasPrefix("git@"), trimmed.contains(":") {
+            return trimmed
+        }
+        guard let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(),
+              ["https", "http", "ssh", "git"].contains(scheme),
+              url.host?.isEmpty == false
+        else {
+            throw ValidationError("Invalid archive remote URL: \(remote)")
+        }
+
+        return trimmed
     }
 }
 

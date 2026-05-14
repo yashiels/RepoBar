@@ -77,14 +77,14 @@ struct CLIEndToEndTests {
     func `reference translate command parses copied issue shorthand`() async throws {
         let output = try await runCLI([
             "reference-translate",
-            "  - scoped issue shorthand: openclaw/clawsweeper#57",
+            "  - scoped issue shorthand: openclaw/ClawSweeper#57",
             "--json"
         ])
         let data = try #require(output.data(using: .utf8))
         let decoded = try JSONDecoder().decode(ReferenceTranslationOutput.self, from: data)
         #expect(decoded.matched)
         #expect(decoded.query == "repositoryIssueNumber")
-        #expect(decoded.repositoryFullName == "openclaw/clawsweeper")
+        #expect(decoded.repositoryFullName == "openclaw/ClawSweeper")
         #expect(decoded.number == 57)
     }
 
@@ -227,6 +227,22 @@ struct CLIEndToEndTests {
             "openclaw/clawhub#2124",
             "openclaw/clawhub#908"
         ])
+    }
+
+    @Test
+    @MainActor
+    func `local command rejects missing root`() async throws {
+        let missingRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("repobar-missing-\(UUID().uuidString)")
+
+        await #expect(throws: ValidationError.self) {
+            _ = try await runCLI([
+                "local",
+                "--root",
+                missingRoot.path,
+                "--json"
+            ])
+        }
     }
 }
 

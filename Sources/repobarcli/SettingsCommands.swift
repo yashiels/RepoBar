@@ -180,7 +180,8 @@ struct SettingsShowCommand: CommanderRunnableCommand {
     }
 
     mutating func run() async throws {
-        let settings = SettingsStore().load()
+        var settings = SettingsStore().load()
+        settings.menuCustomization.normalize()
         if self.output.jsonOutput {
             try printJSON(settings)
             return

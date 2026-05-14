@@ -13,6 +13,13 @@ enum SettingsKey: String, CaseIterable {
     case showActionsMenu = "show-actions-menu"
     case actionsPlanTier = "actions-plan-tier"
     case monitoredOwners = "monitored-owners"
+    case gitHubReferenceMonitor = "github-reference-monitor"
+    case pullRequestNotifications = "pull-request-notifications"
+    case pullRequestNotificationNew = "pull-request-notification-new"
+    case pullRequestNotificationUpdates = "pull-request-notification-updates"
+    case pullRequestNotificationReviews = "pull-request-notification-reviews"
+    case pullRequestNotificationComments = "pull-request-notification-comments"
+    case pullRequestNotificationClick = "pull-request-notification-click"
     case cardDensity = "card-density"
     case accentTone = "accent-tone"
     case activityScope = "activity-scope"
@@ -50,6 +57,20 @@ enum SettingsKey: String, CaseIterable {
             self = .actionsPlanTier
         case "monitored-owners", "actions-owners", "actions-owner-filter", "owners":
             self = .monitoredOwners
+        case "github-reference-monitor", "reference-monitor", "watch-references", "references":
+            self = .gitHubReferenceMonitor
+        case "pull-request-notifications", "pr-notifications", "github-pr-notifications", "notifications":
+            self = .pullRequestNotifications
+        case "pull-request-notification-new", "pr-notification-new", "new-pr-notifications":
+            self = .pullRequestNotificationNew
+        case "pull-request-notification-updates", "pr-notification-updates", "pr-update-notifications":
+            self = .pullRequestNotificationUpdates
+        case "pull-request-notification-reviews", "pr-notification-reviews", "review-request-notifications":
+            self = .pullRequestNotificationReviews
+        case "pull-request-notification-comments", "pr-notification-comments", "comment-notifications":
+            self = .pullRequestNotificationComments
+        case "pull-request-notification-click", "pr-notification-click", "notification-click":
+            self = .pullRequestNotificationClick
         case "card-density", "density":
             self = .cardDensity
         case "accent-tone", "accent":
@@ -135,6 +156,34 @@ func applySetting(_ key: SettingsKey, value: String, settings: inout UserSetting
         let owners = parseOwnerList(value)
         settings.monitoredOwners = owners
         return owners.isEmpty ? "auto" : owners.joined(separator: ", ")
+    case .gitHubReferenceMonitor:
+        let flag = try parseBool(value)
+        settings.gitHubReferenceMonitor.enabled = flag
+        return flag ? "on" : "off"
+    case .pullRequestNotifications:
+        let flag = try parseBool(value)
+        settings.gitHubPullRequestNotifications.enabled = flag
+        return flag ? "on" : "off"
+    case .pullRequestNotificationNew:
+        let flag = try parseBool(value)
+        settings.gitHubPullRequestNotifications.newPullRequests = flag
+        return flag ? "on" : "off"
+    case .pullRequestNotificationUpdates:
+        let flag = try parseBool(value)
+        settings.gitHubPullRequestNotifications.pullRequestUpdates = flag
+        return flag ? "on" : "off"
+    case .pullRequestNotificationReviews:
+        let flag = try parseBool(value)
+        settings.gitHubPullRequestNotifications.reviewRequests = flag
+        return flag ? "on" : "off"
+    case .pullRequestNotificationComments:
+        let flag = try parseBool(value)
+        settings.gitHubPullRequestNotifications.comments = flag
+        return flag ? "on" : "off"
+    case .pullRequestNotificationClick:
+        let action = try parsePullRequestNotificationClickAction(value)
+        settings.gitHubPullRequestNotifications.clickAction = action
+        return action.label
     case .cardDensity:
         guard let density = CardDensity(rawValue: value.lowercased()) else {
             throw ValidationError("Invalid card-density value: \(value)")
@@ -225,6 +274,10 @@ func settingsSummaryLines(settings: UserSettings) -> [String] {
         "Actions menu: \(settings.menuCustomization.hiddenMainMenuItems.contains(.actionsLimits) ? "off" : "on")",
         "Actions plan tier: \(settings.actions.planTier.rawValue)",
         "Monitored owners: \(settings.monitoredOwners.isEmpty ? "auto" : settings.monitoredOwners.joined(separator: ", "))",
+        "GitHub reference monitor: \(settings.gitHubReferenceMonitor.enabled ? "on" : "off")",
+        "PR notifications: \(settings.gitHubPullRequestNotifications.enabled ? "on" : "off")",
+        "PR notification events: \(pullRequestNotificationEventsLabel(settings.gitHubPullRequestNotifications))",
+        "PR notification click: \(settings.gitHubPullRequestNotifications.clickAction.label)",
         "Card density: \(settings.appearance.cardDensity.rawValue)",
         "Accent tone: \(settings.appearance.accentTone.rawValue)",
         "Activity scope: \(settings.appearance.activityScope.rawValue)",
@@ -243,6 +296,23 @@ func settingsSummaryLines(settings: UserSettings) -> [String] {
         "Pinned repositories: \(pinned.isEmpty ? "-" : pinned.joined(separator: ", "))",
         "Hidden repositories: \(hidden.isEmpty ? "-" : hidden.joined(separator: ", "))"
     ]
+}
+
+func pullRequestNotificationEventsLabel(_ settings: GitHubPullRequestNotificationSettings) -> String {
+    var labels: [String] = []
+    if settings.newPullRequests {
+        labels.append("new pull requests")
+    }
+    if settings.pullRequestUpdates {
+        labels.append("updates")
+    }
+    if settings.reviewRequests {
+        labels.append("review requests")
+    }
+    if settings.comments {
+        labels.append("comments")
+    }
+    return labels.isEmpty ? "-" : labels.joined(separator: ", ")
 }
 
 extension GitHubPlanTier {
@@ -270,6 +340,17 @@ func parseBool(_ raw: String) throws -> Bool {
         return false
     default:
         throw ValidationError("Invalid boolean value: \(raw)")
+    }
+}
+
+func parsePullRequestNotificationClickAction(_ raw: String) throws -> GitHubPullRequestNotificationClickAction {
+    switch raw.lowercased() {
+    case "browser", "default-browser", "open-in-browser", "openinbrowser":
+        return .openInBrowser
+    case "issue-navigator", "navigator", "issue", "issues", "open-issue-navigator", "openissuenavigator":
+        return .openIssueNavigator
+    default:
+        throw ValidationError("Invalid pull-request-notification-click value: \(raw)")
     }
 }
 

@@ -32,4 +32,24 @@ struct MarkdownRenderingTests {
         #expect(output.contains("\u{001B}[") == false)
         #expect(output.contains("Heading"))
     }
+
+    @Test
+    func `renders images as readable text`() {
+        let markdown = """
+        Before
+
+        ![RepoBar screenshot](docs/screenshot.png)
+
+        ![](docs/logo.png)
+        """
+
+        let output = renderMarkdown(
+            markdown,
+            request: MarkdownRenderRequest(width: 80, wrap: true, color: false, plain: true)
+        )
+
+        #expect(output.contains("RepoBar screenshot (docs/screenshot.png)"))
+        #expect(output.contains("docs/logo.png"))
+        #expect(output.contains("Image(_data:") == false)
+    }
 }
