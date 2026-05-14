@@ -38,6 +38,11 @@ struct GitHubRestAPITests {
     }
 
     @Test
+    func `queued workflow status scan includes approval and concurrency waits`() {
+        #expect(GitHubRestAPI.queuedWorkflowRunStatuses == ["queued", "waiting", "pending"])
+    }
+
+    @Test
     func `recent issue page keeps raw count while filtering pull requests`() throws {
         let data = Data("""
         [

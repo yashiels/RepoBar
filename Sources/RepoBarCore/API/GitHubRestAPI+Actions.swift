@@ -1,6 +1,8 @@
 import Foundation
 
 extension GitHubRestAPI {
+    static let queuedWorkflowRunStatuses = ["queued", "waiting", "pending"]
+
     func selfHostedRunners(owner: String, repo: String?) async throws -> ActionsRunnerInfo {
         let token = try await tokenProvider()
         let baseURL = await apiHost()
@@ -51,23 +53,40 @@ extension GitHubRestAPI {
             token: token,
             allowedStatuses: [200, 304, 404]
         )
+        let queuedStatuses = Self.queuedWorkflowRunStatuses
         async let queuedData = self.authorizedGet(
-            url: self.actionsRunsURL(baseURL: baseURL, owner: owner, name: name, status: "queued"),
+            url: self.actionsRunsURL(baseURL: baseURL, owner: owner, name: name, status: queuedStatuses[0]),
+            token: token,
+            allowedStatuses: [200, 304, 404]
+        )
+        async let waitingData = self.authorizedGet(
+            url: self.actionsRunsURL(baseURL: baseURL, owner: owner, name: name, status: queuedStatuses[1]),
+            token: token,
+            allowedStatuses: [200, 304, 404]
+        )
+        async let pendingData = self.authorizedGet(
+            url: self.actionsRunsURL(baseURL: baseURL, owner: owner, name: name, status: queuedStatuses[2]),
             token: token,
             allowedStatuses: [200, 304, 404]
         )
 
         let (ipData, _) = try await inProgressData
         let (qData, _) = try await queuedData
+        let (waitingDataValue, _) = try await waitingData
+        let (pendingDataValue, _) = try await pendingData
         let ipResponse = try? GitHubDecoding.decode(ActionsRunsResponse.self, from: ipData)
         let qResponse = try? GitHubDecoding.decode(ActionsRunsResponse.self, from: qData)
+        let waitingResponse = try? GitHubDecoding.decode(ActionsRunsResponse.self, from: waitingDataValue)
+        let pendingResponse = try? GitHubDecoding.decode(ActionsRunsResponse.self, from: pendingDataValue)
+        let queuedResponses = [qResponse, waitingResponse, pendingResponse]
         let repoFullName = "\(owner)/\(name)"
-        let runs = ((ipResponse?.workflowRuns ?? []) + (qResponse?.workflowRuns ?? [])).compactMap { run in
+        let queuedRuns = queuedResponses.flatMap { $0?.workflowRuns ?? [] }
+        let runs = ((ipResponse?.workflowRuns ?? []) + queuedRuns).compactMap { run in
             Self.activeWorkflowRun(from: run, fallbackRepoFullName: repoFullName)
         }
         return ActionsQueueStatus(
             inProgressCount: ipResponse?.totalCount ?? 0,
-            queuedCount: qResponse?.totalCount ?? 0,
+            queuedCount: queuedResponses.reduce(0) { $0 + ($1?.totalCount ?? 0) },
             runs: runs,
             fetchedAt: now
         )
