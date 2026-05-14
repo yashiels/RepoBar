@@ -69,8 +69,12 @@ public struct UserSettings: Equatable, Codable {
         self.authMethod = try container.decodeIfPresent(AuthMethod.self, forKey: .authMethod) ?? .oauth
         let hasActionsSettings = container.contains(.actions)
         self.actions = try container.decodeIfPresent(ActionsSettings.self, forKey: .actions) ?? ActionsSettings()
-        let decodedOwners = try container.decodeIfPresent([String].self, forKey: .monitoredOwners) ?? []
-        self.monitoredOwners = OwnerFilter.normalize(decodedOwners.isEmpty ? self.actions.ownerFilter : decodedOwners)
+        if container.contains(.monitoredOwners) {
+            let decodedOwners = try container.decodeIfPresent([String].self, forKey: .monitoredOwners) ?? []
+            self.monitoredOwners = OwnerFilter.normalize(decodedOwners)
+        } else {
+            self.monitoredOwners = OwnerFilter.normalize(self.actions.ownerFilter)
+        }
         if hasActionsSettings, self.actions.showActionsInMenu {
             self.menuCustomization.hiddenMainMenuItems.remove(.actionsLimits)
         } else {
@@ -98,7 +102,10 @@ public struct UserSettings: Equatable, Codable {
         try container.encode(self.loopbackPort, forKey: .loopbackPort)
         try container.encode(self.authMethod, forKey: .authMethod)
         try container.encode(OwnerFilter.normalize(self.monitoredOwners), forKey: .monitoredOwners)
-        try container.encode(self.actions, forKey: .actions)
+        var actions = self.actions
+        actions.ownerFilter = OwnerFilter.normalize(self.monitoredOwners)
+        actions.monitoredOrg = nil
+        try container.encode(actions, forKey: .actions)
     }
 }
 

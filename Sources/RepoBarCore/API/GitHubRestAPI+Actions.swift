@@ -136,7 +136,7 @@ extension GitHubRestAPI {
             useETag: false
         )
         let decoded = try GitHubDecoding.decode(ArtifactRetentionResponse.self, from: data)
-        return ArtifactRetentionPolicy(retentionDays: decoded.days, maxAllowedDays: decoded.maximumAllowedDays)
+        return ArtifactRetentionPolicy(retentionDays: decoded.days, maxAllowedDays: decoded.maximumAllowedDays ?? decoded.days)
     }
 
     private func actionsRunsURL(baseURL: URL, owner: String, name: String, status: String) -> URL {
@@ -284,7 +284,7 @@ private struct ActionsCacheUsageResponse: Decodable {
 
 private struct ArtifactRetentionResponse: Decodable {
     let days: Int
-    let maximumAllowedDays: Int
+    let maximumAllowedDays: Int?
 
     enum CodingKeys: String, CodingKey {
         case days
