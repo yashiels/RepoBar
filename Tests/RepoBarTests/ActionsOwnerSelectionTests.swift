@@ -75,8 +75,9 @@ struct ActionsOwnerSelectionTests {
             fetchedAt: now
         )
         let repoRunners = ActionsRunnerInfo(
-            totalCount: 2,
+            totalCount: 3,
             runners: [
+                RunnerSummary(id: 1, name: "org-mac-duplicate", os: "macOS", status: "online", busy: false, labels: []),
                 RunnerSummary(id: 2, name: "repo-linux", os: "Linux", status: "online", busy: true, labels: []),
                 RunnerSummary(id: 3, name: "repo-win", os: "Windows", status: "offline", busy: false, labels: [])
             ],

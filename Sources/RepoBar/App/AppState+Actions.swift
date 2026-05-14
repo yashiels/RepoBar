@@ -177,15 +177,13 @@ extension AppState {
         totalRepositoryCount: Int,
         fetchedAt: Date
     ) -> ActionsRunnerInfo? {
-        let repositoryTotalCount = repositoryRunners.reduce(0) { $0 + $1.totalCount }
-        let totalCount = (orgRunners?.totalCount ?? 0) + repositoryTotalCount
-        let isSampled = totalRepositoryCount > scannedRepositoryCount && scannedRepositoryCount > 0
-        guard totalCount > 0 || isSampled else { return nil }
-
         var seenRunnerIDs: Set<Int> = []
         let runners = ((orgRunners?.runners ?? []) + repositoryRunners.flatMap(\.runners)).filter { runner in
             seenRunnerIDs.insert(runner.id).inserted
         }
+        let totalCount = runners.count
+        let isSampled = totalRepositoryCount > scannedRepositoryCount && scannedRepositoryCount > 0
+        guard totalCount > 0 || isSampled else { return nil }
 
         return ActionsRunnerInfo(
             totalCount: totalCount,
