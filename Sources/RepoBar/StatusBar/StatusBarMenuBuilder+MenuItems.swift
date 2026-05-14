@@ -179,7 +179,6 @@ extension StatusBarMenuBuilder {
         submenu.delegate = self.target
 
         let snapshots = session.actionsOrgSnapshots
-        let showOrgHeaders = snapshots.count > 1
 
         for (index, snapshot) in snapshots.enumerated() {
             let tier = snapshot.planTier
@@ -188,12 +187,10 @@ extension StatusBarMenuBuilder {
                 submenu.addItem(.separator())
             }
 
-            if showOrgHeaders {
-                submenu.addItem(self.viewItem(
-                    for: ActionsOrgHeaderView(org: snapshot.org, isOrg: snapshot.isOrg),
-                    enabled: false
-                ))
-            }
+            submenu.addItem(self.viewItem(
+                for: ActionsOrgHeaderView(org: snapshot.org, isOrg: snapshot.isOrg),
+                enabled: false
+            ))
 
             submenu.addItem(self.viewItem(
                 for: ActionsSectionHeaderView(title: "\(tier.label) Plan"),
