@@ -14,6 +14,7 @@
 - Add a multi-reference menu action that opens the current GitHub reference set in Issue Navigator.
 - Show issue, pull request, commit, or workflow run identifiers before titles in the Issue Navigator sidebar.
 - Preserve pasted GitHub reference list order in Issue Navigator and ignore incidental references inside list descriptions.
+- Recognize copied GitHub reference lists that write pull requests as `owner/repo #123`.
 - Open Issue Navigator wider by default so the GitHub preview has more usable space.
 - Fix RepoBar website mobile install cards so long commands and copy controls stay inline without horizontal overflow.
 

@@ -63,13 +63,17 @@ public enum GitHubReferenceTranslator {
         }
 
         let groupedQueries = self.groupedRepositoryIssueQueries(in: text)
-        let groupedIssueNumbers = Set(groupedQueries.compactMap { query in
+        let lineScopedQueries = self.lineScopedRepositoryIssueQueries(in: text)
+        let scopedIssueNumbers = Set((groupedQueries + lineScopedQueries).compactMap { query in
             if case let .repositoryIssueNumber(_, number) = query {
                 return number
             }
             return nil
         })
         for query in groupedQueries {
+            append(query)
+        }
+        for query in lineScopedQueries {
             append(query)
         }
 
@@ -81,7 +85,7 @@ public enum GitHubReferenceTranslator {
                 allowBareIssueNumber: false,
                 allowNumericCommitHash: allowsNumericCommitHash
             ) {
-                if case let .issueNumber(number) = query, groupedIssueNumbers.contains(number) {
+                if case let .issueNumber(number) = query, scopedIssueNumbers.contains(number) {
                     continue
                 }
                 append(self.applyingRepositoryContext(repositoryContext, to: query))
@@ -177,6 +181,32 @@ public enum GitHubReferenceTranslator {
 
                 return .repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number)
             }
+    }
+
+    private static func lineScopedRepositoryIssueQueries(in text: String) -> [GitHubReferenceQuery] {
+        text
+            .split(whereSeparator: \.isNewline)
+            .flatMap { self.lineScopedRepositoryIssueQueries(inLine: String($0)) }
+    }
+
+    private static func lineScopedRepositoryIssueQueries(inLine line: String) -> [GitHubReferenceQuery] {
+        let tokens = self.referenceTokens(in: line)
+        guard tokens.count >= 2 else { return [] }
+
+        var queries: [GitHubReferenceQuery] = []
+        for index in tokens.indices.dropLast() {
+            let repositoryFullName = tokens[index]
+            guard self.isRepositoryFullName(repositoryFullName),
+                  let number = self.issueNumber(
+                      from: tokens[tokens.index(after: index)],
+                      minimumBareDigits: 1,
+                      allowBareNumber: false
+                  )
+            else { continue }
+
+            queries.append(.repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number))
+        }
+        return queries
     }
 
     private static func tokenQuery(

@@ -198,6 +198,31 @@ struct GitHubReferenceMonitorTests {
     }
 
     @Test
+    func `multiple repository issue references allow space before issue number`() {
+        let text = """
+          - steipete/birdclaw #23: X bookmarks max_results=90 workaround. Small, 4 files, tests
+            included, strong real-world bug proof. Best first review.
+          - steipete/birdclaw #18: --early-stop dedupe saturation for likes/bookmarks. Larger but
+            self-contained, lots of tests/docs, live smoke in PR body.
+          - steipete/oracle #194: browser upload ZIP bundle format. Medium 17-file feature, tests/
+            docs/changelog included. Worth review before it rots.
+          - steipete/steipete.me #224: blog post "When Claude Emails Claude". Clean, old green CI,
+            content-only-ish plus hero image. Likely easy land/close decision.
+          - steipete/camsnap #2: Docker + GHCR publishing. Small 4-file PR but DIRTY; good review/fix
+            candidate if Docker support still wanted.
+
+          Skipped for now:
+        """
+        #expect(GitHubReferenceTranslator.queries(from: text).map(\.displayText) == [
+            "steipete/birdclaw#23",
+            "steipete/birdclaw#18",
+            "steipete/oracle#194",
+            "steipete/steipete.me#224",
+            "steipete/camsnap#2"
+        ])
+    }
+
+    @Test
     func `multiple parser ignores slash words that are not repository context`() {
         let text = """
         Found items in openclaw/gogcli.
