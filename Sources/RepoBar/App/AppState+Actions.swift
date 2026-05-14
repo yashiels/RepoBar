@@ -129,7 +129,8 @@ extension AppState {
             allRuns.append(contentsOf: status.runs)
         }
 
-        guard totalInProgress > 0 || totalQueued > 0 else { return nil }
+        let isSampled = repos.count > sample.count
+        guard totalInProgress > 0 || totalQueued > 0 || isSampled else { return nil }
 
         return ActionsQueueStatus(
             inProgressCount: totalInProgress,

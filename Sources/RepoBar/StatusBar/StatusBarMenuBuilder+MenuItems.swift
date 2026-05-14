@@ -245,7 +245,7 @@ extension StatusBarMenuBuilder {
                 }
             }
 
-            if !snapshot.hasRunners, !snapshot.hasActiveJobs {
+            if !snapshot.hasRunners, !snapshot.hasActiveJobs, snapshot.queueStatus?.isRepositorySampled != true {
                 submenu.addItem(self.infoItem("No active runners or jobs"))
             }
         }

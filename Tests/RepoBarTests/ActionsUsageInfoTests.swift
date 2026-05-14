@@ -55,6 +55,21 @@ struct ActionsUsageInfoTests {
         #expect(status.repositorySampleDescription == nil)
     }
 
+    @Test
+    func `repository sample description appears even when sampled jobs are idle`() {
+        let status = ActionsQueueStatus(
+            inProgressCount: 0,
+            queuedCount: 0,
+            fetchedAt: Self.date("2026-05-14T12:00:00Z"),
+            scannedRepositoryCount: 5,
+            totalRepositoryCount: 9
+        )
+
+        #expect(status.totalActiveCount == 0)
+        #expect(status.isRepositorySampled)
+        #expect(status.repositorySampleDescription == "Sampled 5 of 9 repos")
+    }
+
     private static func item(date: String, quantity: Double, unitType: String = "minutes") -> ActionsUsageItem {
         ActionsUsageItem(
             date: date,
