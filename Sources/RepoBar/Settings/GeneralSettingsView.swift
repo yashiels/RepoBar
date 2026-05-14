@@ -99,6 +99,11 @@ struct GeneralSettingsView: View {
                         .onChange(of: self.session.settings.appearance.showContributionHeader) { _, _ in
                             self.appState.persistSettings()
                         }
+                    Toggle("Show GitHub rate-limit meter in menu bar", isOn: self.$session.settings.appearance.showRateLimitMeterInMenuBar)
+                        .onChange(of: self.session.settings.appearance.showRateLimitMeterInMenuBar) { _, _ in
+                            self.appState.persistSettings()
+                            NotificationCenter.default.post(name: .menuDiagnosticsDidChange, object: nil)
+                        }
                     Picker("Activity feed", selection: self.$session.settings.appearance.activityScope) {
                         ForEach(GlobalActivityScope.allCases, id: \.self) { scope in
                             Text(scope.label).tag(scope)
