@@ -9,7 +9,10 @@ extension AppState {
         guard case let .loggedIn(user) = self.session.account else { return }
 
         let github = self.github
-        let repos = self.session.repositories
+        let repos = Self.actionsRepositories(
+            repositories: self.session.repositories,
+            menuSnapshot: self.session.menuSnapshot
+        )
 
         let userTier = user.detectedPlanTier ?? settings.planTier
         await MainActor.run { self.session.actionsPlanTier = userTier }
@@ -19,9 +22,14 @@ extension AppState {
             repositories: repos,
             monitoredOwners: self.session.settings.monitoredOwners
         )
+        if Task.isCancelled { return }
+
+        await self.publishActionsOwnerPlaceholders(owners: owners, planTier: userTier)
 
         var snapshots: [ActionsOrgSnapshot] = []
         for owner in owners {
+            if Task.isCancelled { return }
+
             let ownerRepos = repos.filter { $0.owner.lowercased() == owner.name.lowercased() }
             let runners = await Self.fetchRunners(github: github, owner: owner.name, repos: ownerRepos)
             let queue = await Self.fetchQueueStatus(github: github, repos: ownerRepos)
@@ -51,6 +59,37 @@ extension AppState {
         }
 
         await MainActor.run {
+            self.session.actionsOrgSnapshots = snapshots
+            NotificationCenter.default.post(name: .menuRepositoriesDidChange, object: nil)
+        }
+    }
+
+    static func actionsRepositories(repositories: [Repository], menuSnapshot: MenuSnapshot?) -> [Repository] {
+        if repositories.isEmpty == false {
+            return repositories
+        }
+
+        return menuSnapshot?.repositories ?? []
+    }
+
+    private func publishActionsOwnerPlaceholders(
+        owners: [(name: String, isOrg: Bool)],
+        planTier: GitHubPlanTier
+    ) async {
+        let snapshots = owners.map { owner in
+            ActionsOrgSnapshot(
+                org: owner.name,
+                runners: nil,
+                queueStatus: nil,
+                planTier: planTier,
+                isOrg: owner.isOrg,
+                minutesIncluded: planTier.includedMinutesPerMonth
+            )
+        }
+
+        await MainActor.run {
+            guard self.session.actionsOrgSnapshots != snapshots else { return }
+
             self.session.actionsOrgSnapshots = snapshots
             NotificationCenter.default.post(name: .menuRepositoriesDidChange, object: nil)
         }

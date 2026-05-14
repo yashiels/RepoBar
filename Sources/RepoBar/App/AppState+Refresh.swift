@@ -147,6 +147,7 @@ extension AppState {
                 self.session.lastError = error.userFacingMessage
                 NotificationCenter.default.post(name: .menuDiagnosticsDidChange, object: nil)
             }
+            await self.refreshActionsLimitsState()
         }
     }
 

@@ -40,6 +40,18 @@ struct ActionsOwnerSelectionTests {
     }
 
     @Test @MainActor
+    func `uses cached menu snapshot repositories when live repositories are empty`() {
+        let snapshotRepos = [
+            Self.repo(owner: "openclaw", name: "clawsweeper")
+        ]
+        let snapshot = MenuSnapshot(repositories: snapshotRepos, capturedAt: Date())
+
+        let repos = AppState.actionsRepositories(repositories: [], menuSnapshot: snapshot)
+
+        #expect(repos.map(\.fullName) == ["openclaw/clawsweeper"])
+    }
+
+    @Test @MainActor
     func `falls back to repository runner scan when org runner list is empty`() {
         let repos = [Self.repo(owner: "openclaw", name: "clawsweeper")]
         let emptyOrgRunners = ActionsRunnerInfo(totalCount: 0, runners: [], fetchedAt: Date())
