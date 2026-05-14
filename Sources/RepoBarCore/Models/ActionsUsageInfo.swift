@@ -340,12 +340,23 @@ public struct ActionsQueueStatus: Sendable, Equatable {
     public let queuedCount: Int
     public let runs: [ActiveWorkflowRun]
     public let fetchedAt: Date
+    public let scannedRepositoryCount: Int
+    public let totalRepositoryCount: Int
 
-    public init(inProgressCount: Int, queuedCount: Int, runs: [ActiveWorkflowRun] = [], fetchedAt: Date) {
+    public init(
+        inProgressCount: Int,
+        queuedCount: Int,
+        runs: [ActiveWorkflowRun] = [],
+        fetchedAt: Date,
+        scannedRepositoryCount: Int = 0,
+        totalRepositoryCount: Int = 0
+    ) {
         self.inProgressCount = inProgressCount
         self.queuedCount = queuedCount
         self.runs = runs
         self.fetchedAt = fetchedAt
+        self.scannedRepositoryCount = scannedRepositoryCount
+        self.totalRepositoryCount = totalRepositoryCount
     }
 
     public var totalActiveCount: Int {
@@ -361,6 +372,16 @@ public struct ActionsQueueStatus: Sendable, Equatable {
 
         let pct = (1.0 - Double(self.inProgressCount) / Double(limit)) * 100
         return min(100, max(0, pct))
+    }
+
+    public var isRepositorySampled: Bool {
+        self.totalRepositoryCount > self.scannedRepositoryCount && self.scannedRepositoryCount > 0
+    }
+
+    public var repositorySampleDescription: String? {
+        guard self.isRepositorySampled else { return nil }
+
+        return "Sampled \(self.scannedRepositoryCount) of \(self.totalRepositoryCount) repos"
     }
 }
 

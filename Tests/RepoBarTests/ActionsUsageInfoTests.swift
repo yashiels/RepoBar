@@ -30,12 +30,29 @@ struct ActionsUsageInfoTests {
         let status = ActionsQueueStatus(
             inProgressCount: 2,
             queuedCount: 30,
-            fetchedAt: Self.date("2026-05-14T12:00:00Z")
+            fetchedAt: Self.date("2026-05-14T12:00:00Z"),
+            scannedRepositoryCount: 5,
+            totalRepositoryCount: 12
         )
 
         #expect(status.totalActiveCount == 32)
         #expect(status.remainingConcurrentJobs(limit: 20) == 18)
         #expect(status.remainingConcurrentPercent(limit: 20) == 90)
+        #expect(status.repositorySampleDescription == "Sampled 5 of 12 repos")
+    }
+
+    @Test
+    func `repository sample description stays hidden for exhaustive queue scans`() {
+        let status = ActionsQueueStatus(
+            inProgressCount: 0,
+            queuedCount: 0,
+            fetchedAt: Self.date("2026-05-14T12:00:00Z"),
+            scannedRepositoryCount: 4,
+            totalRepositoryCount: 4
+        )
+
+        #expect(status.isRepositorySampled == false)
+        #expect(status.repositorySampleDescription == nil)
     }
 
     private static func item(date: String, quantity: Double, unitType: String = "minutes") -> ActionsUsageItem {

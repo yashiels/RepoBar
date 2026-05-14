@@ -118,7 +118,7 @@ extension AppState {
         var allRuns: [ActiveWorkflowRun] = []
         let now = Date()
 
-        let sample = repos.prefix(5)
+        let sample = Array(repos.prefix(5))
         for repo in sample {
             guard let status = try? await github.actionsQueueStatus(owner: repo.owner, name: repo.name) else {
                 continue
@@ -135,7 +135,9 @@ extension AppState {
             inProgressCount: totalInProgress,
             queuedCount: totalQueued,
             runs: allRuns,
-            fetchedAt: now
+            fetchedAt: now,
+            scannedRepositoryCount: sample.count,
+            totalRepositoryCount: repos.count
         )
     }
 }

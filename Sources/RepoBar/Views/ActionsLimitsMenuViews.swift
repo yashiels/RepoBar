@@ -150,6 +150,13 @@ struct ActionsQueueRowView: View {
                 }
                 Spacer(minLength: 0)
             }
+
+            if let repositorySampleDescription = self.queueStatus.repositorySampleDescription {
+                Text(repositorySampleDescription)
+                    .font(.caption2)
+                    .foregroundStyle(MenuHighlightStyle.secondary(self.isHighlighted))
+                    .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, ActionsMenuMetrics.horizontalPadding)
