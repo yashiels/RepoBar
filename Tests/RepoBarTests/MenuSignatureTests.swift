@@ -144,6 +144,31 @@ struct MenuSignatureTests {
         #expect(signatureA != signatureB)
     }
 
+    @Test
+    func `actions snapshot signature changes with displayed runner state`() {
+        let now = Date(timeIntervalSinceReferenceDate: 4_000_000)
+        let idle = Self.actionsSnapshot(
+            runner: RunnerSummary(id: 1, name: "mac-mini", os: "macOS", status: "online", busy: false, labels: ["self-hosted", "macOS"]),
+            now: now
+        )
+        let busy = Self.actionsSnapshot(
+            runner: RunnerSummary(id: 1, name: "mac-mini", os: "macOS", status: "online", busy: true, labels: ["self-hosted", "macOS"]),
+            now: now
+        )
+
+        #expect(ActionsSnapshotSignature.digest(for: [idle]) != ActionsSnapshotSignature.digest(for: [busy]))
+    }
+
+    private static func actionsSnapshot(runner: RunnerSummary, now: Date) -> ActionsOrgSnapshot {
+        ActionsOrgSnapshot(
+            org: "openclaw",
+            runners: ActionsRunnerInfo(totalCount: 1, runners: [runner], fetchedAt: now),
+            queueStatus: nil,
+            planTier: .team,
+            isOrg: true
+        )
+    }
+
     private static func cacheSummary(remaining: Int, now: Date) -> RepoBarCacheSummary {
         RepoBarCacheSummary(
             databasePath: "/tmp/cache.sqlite",
