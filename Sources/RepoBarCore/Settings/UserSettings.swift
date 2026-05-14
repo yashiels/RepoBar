@@ -67,12 +67,13 @@ public struct UserSettings: Equatable, Codable {
         self.enterpriseHost = try container.decodeIfPresent(URL.self, forKey: .enterpriseHost)
         self.loopbackPort = try container.decodeIfPresent(Int.self, forKey: .loopbackPort) ?? 53682
         self.authMethod = try container.decodeIfPresent(AuthMethod.self, forKey: .authMethod) ?? .oauth
+        let hasActionsSettings = container.contains(.actions)
         self.actions = try container.decodeIfPresent(ActionsSettings.self, forKey: .actions) ?? ActionsSettings()
         let decodedOwners = try container.decodeIfPresent([String].self, forKey: .monitoredOwners) ?? []
         self.monitoredOwners = OwnerFilter.normalize(decodedOwners.isEmpty ? self.actions.ownerFilter : decodedOwners)
-        if self.actions.showActionsInMenu {
+        if hasActionsSettings, self.actions.showActionsInMenu {
             self.menuCustomization.hiddenMainMenuItems.remove(.actionsLimits)
-        } else if container.contains(.actions) {
+        } else {
             self.menuCustomization.hiddenMainMenuItems.insert(.actionsLimits)
         }
     }

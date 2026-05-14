@@ -351,6 +351,17 @@ public struct ActionsQueueStatus: Sendable, Equatable {
     public var totalActiveCount: Int {
         self.inProgressCount + self.queuedCount
     }
+
+    public func remainingConcurrentJobs(limit: Int) -> Int {
+        max(0, limit - self.inProgressCount)
+    }
+
+    public func remainingConcurrentPercent(limit: Int) -> Double {
+        guard limit > 0 else { return 100 }
+
+        let pct = (1.0 - Double(self.inProgressCount) / Double(limit)) * 100
+        return min(100, max(0, pct))
+    }
 }
 
 // MARK: - Actions Cache Usage

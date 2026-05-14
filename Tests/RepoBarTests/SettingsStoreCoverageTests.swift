@@ -99,11 +99,15 @@ struct SettingsStoreCoverageTests {
         let data = try JSONEncoder().encode(UserSettings())
         var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
         object.removeValue(forKey: "actions")
+        var customization = try #require(object["menuCustomization"] as? [String: Any])
+        customization["hiddenMainMenuItems"] = []
+        object["menuCustomization"] = customization
         let legacyData = try JSONSerialization.data(withJSONObject: object)
 
         let loaded = try JSONDecoder().decode(UserSettings.self, from: legacyData)
 
         #expect(loaded.actions.showActionsInMenu == false)
+        #expect(loaded.menuCustomization.hiddenMainMenuItems.contains(.actionsLimits))
     }
 
     @Test
@@ -121,6 +125,7 @@ struct SettingsStoreCoverageTests {
 
         #expect(loaded.actions.showActionsInMenu)
         #expect(loaded.monitoredOwners == ["openclaw"])
+        #expect(!loaded.menuCustomization.hiddenMainMenuItems.contains(.actionsLimits))
     }
 
     @Test

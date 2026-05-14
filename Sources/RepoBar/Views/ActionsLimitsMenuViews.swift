@@ -127,7 +127,7 @@ struct ActionsQueueRowView: View {
 
                 Spacer(minLength: 8)
 
-                Text("\(self.planTier.concurrentJobs - self.queueStatus.totalActiveCount) / \(self.planTier.concurrentJobs) remaining")
+                Text("\(self.remainingConcurrentJobs) / \(self.planTier.concurrentJobs) remaining")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -157,10 +157,11 @@ struct ActionsQueueRowView: View {
     }
 
     private var remainingPercent: Double {
-        guard self.planTier.concurrentJobs > 0 else { return 100 }
+        self.queueStatus.remainingConcurrentPercent(limit: self.planTier.concurrentJobs)
+    }
 
-        let pct = (1.0 - Double(self.queueStatus.totalActiveCount) / Double(self.planTier.concurrentJobs)) * 100
-        return min(100, max(0, pct))
+    private var remainingConcurrentJobs: Int {
+        self.queueStatus.remainingConcurrentJobs(limit: self.planTier.concurrentJobs)
     }
 
     private static func tint(for remainingPercent: Double) -> Color {

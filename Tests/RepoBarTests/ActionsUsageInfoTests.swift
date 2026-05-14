@@ -25,6 +25,19 @@ struct ActionsUsageInfoTests {
         #expect(ActionsUsageInfo.date(fromUsageDate: "not-a-date") == nil)
     }
 
+    @Test
+    func `remaining concurrent jobs ignores queued runs`() {
+        let status = ActionsQueueStatus(
+            inProgressCount: 2,
+            queuedCount: 30,
+            fetchedAt: Self.date("2026-05-14T12:00:00Z")
+        )
+
+        #expect(status.totalActiveCount == 32)
+        #expect(status.remainingConcurrentJobs(limit: 20) == 18)
+        #expect(status.remainingConcurrentPercent(limit: 20) == 90)
+    }
+
     private static func item(date: String, quantity: Double, unitType: String = "minutes") -> ActionsUsageItem {
         ActionsUsageItem(
             date: date,
