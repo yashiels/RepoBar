@@ -80,6 +80,7 @@ enum RateLimitStatusIconRenderer {
 
     private static func bucket(_ percent: Double?) -> Int {
         guard let percent else { return -1 }
+
         return Int(max(0, min(100, percent)).rounded())
     }
 

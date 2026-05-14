@@ -90,7 +90,77 @@ struct SettingsStoreCoverageTests {
         let loaded = try JSONDecoder().decode(UserSettings.self, from: legacyData)
         #expect(loaded.repoList.displayLimit == 4)
         #expect(loaded.gitHubReferenceMonitor == GitHubReferenceMonitorSettings())
+        #expect(loaded.actions == ActionsSettings())
         #expect(loaded.githubArchives == GitHubArchiveSettings())
+    }
+
+    @Test
+    func `load older action settings defaults to hidden`() throws {
+        let data = try JSONEncoder().encode(UserSettings())
+        var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "actions")
+        var customization = try #require(object["menuCustomization"] as? [String: Any])
+        customization["hiddenMainMenuItems"] = []
+        object["menuCustomization"] = customization
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+        let loaded = try JSONDecoder().decode(UserSettings.self, from: legacyData)
+
+        #expect(loaded.actions.showActionsInMenu == false)
+        #expect(loaded.menuCustomization.hiddenMainMenuItems.contains(.actionsLimits))
+    }
+
+    @Test
+    func `load legacy monitored action org as monitored owners`() throws {
+        let data = try JSONEncoder().encode(UserSettings())
+        var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "monitoredOwners")
+        object["actions"] = [
+            "showActionsInMenu": true,
+            "planTier": "Free",
+            "monitoredOrg": "OpenClaw"
+        ]
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+        let loaded = try JSONDecoder().decode(UserSettings.self, from: legacyData)
+
+        #expect(loaded.actions.showActionsInMenu)
+        #expect(loaded.monitoredOwners == ["openclaw"])
+        #expect(!loaded.menuCustomization.hiddenMainMenuItems.contains(.actionsLimits))
+    }
+
+    @Test
+    func `load explicit empty monitored owners does not revive legacy action owner filter`() throws {
+        let data = try JSONEncoder().encode(UserSettings())
+        var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object["monitoredOwners"] = []
+        object["actions"] = [
+            "showActionsInMenu": true,
+            "planTier": "Free",
+            "monitoredOrg": "OpenClaw"
+        ]
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+        let loaded = try JSONDecoder().decode(UserSettings.self, from: legacyData)
+
+        #expect(loaded.monitoredOwners.isEmpty)
+        #expect(loaded.actions.ownerFilter == ["openclaw"])
+        #expect(!loaded.menuCustomization.hiddenMainMenuItems.contains(.actionsLimits))
+    }
+
+    @Test
+    func `encode syncs legacy action owner filter from monitored owners`() throws {
+        var settings = UserSettings()
+        settings.monitoredOwners = []
+        settings.actions.ownerFilter = ["openclaw"]
+        settings.actions.monitoredOrg = "OpenClaw"
+
+        let data = try JSONEncoder().encode(settings)
+        let loaded = try JSONDecoder().decode(UserSettings.self, from: data)
+
+        #expect(loaded.monitoredOwners.isEmpty)
+        #expect(loaded.actions.ownerFilter.isEmpty)
+        #expect(loaded.actions.monitoredOrg == nil)
     }
 
     @Test

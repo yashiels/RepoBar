@@ -37,6 +37,8 @@ final class Session {
     var localProjectsAccessDenied = false
     var gitHubReferenceMatches: [GitHubReferenceMatch] = []
     var gitHubReferenceMatch: GitHubReferenceMatch?
+    var actionsOrgSnapshots: [ActionsOrgSnapshot] = []
+    var actionsPlanTier: GitHubPlanTier = .free
 
     var rateLimitDisplayState: RateLimitDisplayState {
         RateLimitDisplayState(

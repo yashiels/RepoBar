@@ -158,6 +158,130 @@ extension StatusBarMenuBuilder {
         return submenu
     }
 
+    // MARK: - Actions & Runners
+
+    func actionsLimitsStatusMenuItem(now: Date = Date()) -> NSMenuItem {
+        let session = self.appState.session
+        let summary = Self.actionsCompactSummary(session: session)
+        let hasRunners = session.actionsOrgSnapshots.contains { $0.runners?.onlineCount ?? 0 > 0 }
+        let view = ActionsLimitsStatusRowView(summary: summary, hasRunners: hasRunners)
+        return self.viewItem(
+            for: view,
+            enabled: true,
+            highlightable: true,
+            submenu: self.actionsLimitsSubmenu(session: session, now: now)
+        )
+    }
+
+    private func actionsLimitsSubmenu(session: Session, now _: Date) -> NSMenu {
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        submenu.delegate = self.target
+
+        let snapshots = session.actionsOrgSnapshots
+
+        for (index, snapshot) in snapshots.enumerated() {
+            let tier = snapshot.planTier
+
+            if index > 0 {
+                submenu.addItem(.separator())
+            }
+
+            submenu.addItem(self.viewItem(
+                for: ActionsOrgHeaderView(org: snapshot.org, isOrg: snapshot.isOrg),
+                enabled: false
+            ))
+
+            submenu.addItem(self.viewItem(
+                for: ActionsSectionHeaderView(title: "\(tier.label) Plan"),
+                enabled: false
+            ))
+
+            if let used = snapshot.minutesUsed, let included = snapshot.minutesIncluded {
+                submenu.addItem(self.viewItem(
+                    for: ActionsMinutesRowView(minutesUsed: used, minutesIncluded: included),
+                    enabled: false
+                ))
+            }
+
+            if let queueStatus = snapshot.queueStatus {
+                submenu.addItem(self.viewItem(
+                    for: ActionsQueueRowView(queueStatus: queueStatus, planTier: tier),
+                    enabled: false
+                ))
+            }
+
+            if let cache = snapshot.cacheUsage {
+                submenu.addItem(self.viewItem(
+                    for: ActionsCacheUsageRowView(cacheUsage: cache),
+                    enabled: false
+                ))
+            }
+
+            if let retention = snapshot.artifactRetention {
+                submenu.addItem(self.viewItem(
+                    for: ArtifactRetentionRowView(retention: retention),
+                    enabled: false
+                ))
+            }
+
+            if let runners = snapshot.runners, runners.totalCount > 0 || runners.isRepositorySampled {
+                submenu.addItem(self.viewItem(
+                    for: ActionsRunnerFleetRowView(runners: runners),
+                    enabled: false
+                ))
+
+                for runner in runners.runners.prefix(10) {
+                    submenu.addItem(self.viewItem(
+                        for: ActionsRunnerRowView(runner: runner),
+                        enabled: false
+                    ))
+                }
+                if runners.totalCount > 10 {
+                    submenu.addItem(self.infoItem("… and \(runners.totalCount - 10) more"))
+                }
+            }
+
+            let hasPartialRunnerOrQueueScan = snapshot.runners?.isRepositorySampled == true || snapshot.queueStatus?.isRepositorySampled == true
+            if !snapshot.hasRunners, !snapshot.hasActiveJobs, !hasPartialRunnerOrQueueScan {
+                submenu.addItem(self.infoItem("No active runners or jobs"))
+            }
+        }
+
+        if snapshots.isEmpty {
+            submenu.addItem(self.infoItem(session.account.isLoggedIn ? "Loading owners…" : "No owners found"))
+        }
+
+        return submenu
+    }
+
+    private static func actionsCompactSummary(session: Session) -> String {
+        let snapshots = session.actionsOrgSnapshots
+        let totalRunners = snapshots.compactMap(\.runners).reduce(0) { $0 + $1.totalCount }
+        let onlineRunners = snapshots.compactMap(\.runners).reduce(0) { $0 + $1.onlineCount }
+        let activeJobs = snapshots.compactMap(\.queueStatus).reduce(0) { $0 + $1.totalActiveCount }
+        let orgCount = snapshots.count(where: \.isOrg)
+
+        var parts: [String] = []
+        if totalRunners > 0 {
+            parts.append("\(onlineRunners)/\(totalRunners) runners")
+        }
+        if activeJobs > 0 {
+            parts.append("\(activeJobs) jobs active")
+        }
+        if parts.isEmpty {
+            if snapshots.isEmpty, session.account.isLoggedIn {
+                parts.append("Loading owners")
+            } else if orgCount > 0 {
+                let ownerCount = snapshots.count
+                parts.append("\(ownerCount) owner\(ownerCount == 1 ? "" : "s")")
+            } else {
+                parts.append("Personal account")
+            }
+        }
+        return parts.joined(separator: " · ")
+    }
+
     func actionItem(
         title: String,
         action: Selector,

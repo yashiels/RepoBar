@@ -10,6 +10,9 @@ enum SettingsKey: String, CaseIterable {
     case menuSort = "menu-sort"
     case showContributionHeader = "show-contribution-header"
     case showRateLimitMeter = "show-rate-limit-meter"
+    case showActionsMenu = "show-actions-menu"
+    case actionsPlanTier = "actions-plan-tier"
+    case monitoredOwners = "monitored-owners"
     case cardDensity = "card-density"
     case accentTone = "accent-tone"
     case activityScope = "activity-scope"
@@ -41,6 +44,12 @@ enum SettingsKey: String, CaseIterable {
             self = .showContributionHeader
         case "show-rate-limit-meter", "rate-limit-meter", "menu-bar-rate-limit-meter":
             self = .showRateLimitMeter
+        case "show-actions-menu", "actions-menu", "actions":
+            self = .showActionsMenu
+        case "actions-plan-tier", "actions-plan", "plan-tier":
+            self = .actionsPlanTier
+        case "monitored-owners", "actions-owners", "actions-owner-filter", "owners":
+            self = .monitoredOwners
         case "card-density", "density":
             self = .cardDensity
         case "accent-tone", "accent":
@@ -106,6 +115,26 @@ func applySetting(_ key: SettingsKey, value: String, settings: inout UserSetting
         let flag = try parseBool(value)
         settings.appearance.showRateLimitMeterInMenuBar = flag
         return flag ? "on" : "off"
+    case .showActionsMenu:
+        let flag = try parseBool(value)
+        settings.actions.showActionsInMenu = flag
+        if flag {
+            settings.menuCustomization.hiddenMainMenuItems.remove(.actionsLimits)
+        } else {
+            settings.menuCustomization.hiddenMainMenuItems.insert(.actionsLimits)
+        }
+        return flag ? "on" : "off"
+    case .actionsPlanTier:
+        guard let tier = GitHubPlanTier(argument: value) else {
+            throw ValidationError("Invalid actions-plan-tier value: \(value)")
+        }
+
+        settings.actions.planTier = tier
+        return tier.rawValue
+    case .monitoredOwners:
+        let owners = parseOwnerList(value)
+        settings.monitoredOwners = owners
+        return owners.isEmpty ? "auto" : owners.joined(separator: ", ")
     case .cardDensity:
         guard let density = CardDensity(rawValue: value.lowercased()) else {
             throw ValidationError("Invalid card-density value: \(value)")
@@ -193,6 +222,9 @@ func settingsSummaryLines(settings: UserSettings) -> [String] {
         "Menu sort: \(settings.repoList.menuSortKey.rawValue)",
         "Contribution header: \(settings.appearance.showContributionHeader ? "on" : "off")",
         "Rate-limit menu bar meter: \(settings.appearance.showRateLimitMeterInMenuBar ? "on" : "off")",
+        "Actions menu: \(settings.menuCustomization.hiddenMainMenuItems.contains(.actionsLimits) ? "off" : "on")",
+        "Actions plan tier: \(settings.actions.planTier.rawValue)",
+        "Monitored owners: \(settings.monitoredOwners.isEmpty ? "auto" : settings.monitoredOwners.joined(separator: ", "))",
         "Card density: \(settings.appearance.cardDensity.rawValue)",
         "Accent tone: \(settings.appearance.accentTone.rawValue)",
         "Activity scope: \(settings.appearance.activityScope.rawValue)",
@@ -213,6 +245,23 @@ func settingsSummaryLines(settings: UserSettings) -> [String] {
     ]
 }
 
+extension GitHubPlanTier {
+    init?(argument: String) {
+        switch argument.lowercased() {
+        case "free":
+            self = .free
+        case "pro", "developer":
+            self = .pro
+        case "team":
+            self = .team
+        case "enterprise", "ent":
+            self = .enterprise
+        default:
+            return nil
+        }
+    }
+}
+
 func parseBool(_ raw: String) throws -> Bool {
     switch raw.lowercased() {
     case "1", "true", "yes", "y", "on":
@@ -222,6 +271,15 @@ func parseBool(_ raw: String) throws -> Bool {
     default:
         throw ValidationError("Invalid boolean value: \(raw)")
     }
+}
+
+func parseOwnerList(_ raw: String) -> [String] {
+    let lowered = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    guard lowered != "auto", lowered != "all", lowered != "-" else { return [] }
+
+    return OwnerFilter.normalize(raw.split { separator in
+        separator == "," || separator == " " || separator == "\n" || separator == "\t"
+    }.map(String.init))
 }
 
 func parsePositiveInt(_ raw: String, label: String) throws -> Int {

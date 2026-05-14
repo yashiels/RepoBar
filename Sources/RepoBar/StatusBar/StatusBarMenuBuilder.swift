@@ -55,6 +55,7 @@ final class StatusBarMenuBuilder {
             heatmapRangeStart: session.heatmapRange.start.timeIntervalSinceReferenceDate,
             heatmapRangeEnd: session.heatmapRange.end.timeIntervalSinceReferenceDate,
             reposDigest: RepoSignature.digest(for: repos),
+            actionsDigest: ActionsSnapshotSignature.digest(for: session.actionsOrgSnapshots),
             timeBucket: Int(now.timeIntervalSinceReferenceDate / 60)
         )
         return MainMenuPlan(repos: repos, signature: signature)
@@ -161,6 +162,10 @@ final class StatusBarMenuBuilder {
             guard case .loggedIn = session.account else { return [] }
 
             return [self.rateLimitsStatusMenuItem()]
+        case .actionsLimits:
+            guard case .loggedIn = session.account else { return [] }
+
+            return [self.actionsLimitsStatusMenuItem()]
         case .filters:
             let isLoggedIn = session.account.isLoggedIn
             let hasLocalFolder = session.settings.localProjects.rootPath?.isEmpty == false

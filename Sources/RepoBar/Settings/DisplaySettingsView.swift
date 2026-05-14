@@ -7,14 +7,6 @@ struct DisplaySettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Toggle("Show GitHub rate-limit meter in menu bar", isOn: self.$session.settings.appearance.showRateLimitMeterInMenuBar)
-                .onChange(of: self.session.settings.appearance.showRateLimitMeterInMenuBar) { _, _ in
-                    self.appState.persistSettings()
-                    NotificationCenter.default.post(name: .menuDiagnosticsDidChange, object: nil)
-                }
-
-            Divider()
-
             HStack {
                 Text("Customize the menu layout and repo submenu items.")
                     .font(.callout)
@@ -165,6 +157,11 @@ struct DisplaySettingsView: View {
 
     private func updateCustomization(_ customization: MenuCustomization) {
         self.session.settings.menuCustomization = customization
+        self.session.settings.actions.showActionsInMenu = !customization.hiddenMainMenuItems.contains(.actionsLimits)
+        if customization.hiddenMainMenuItems.contains(.actionsLimits) {
+            self.session.actionsOrgSnapshots = []
+            NotificationCenter.default.post(name: .menuRepositoriesDidChange, object: nil)
+        }
         self.appState.persistSettings()
         self.appState.requestRefresh()
     }

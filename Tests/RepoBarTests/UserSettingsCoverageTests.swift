@@ -26,6 +26,12 @@ struct UserSettingsCoverageTests {
         #expect(AccentTone.githubGreen.label == "GitHub greens")
         #expect(AppearanceSettings().showRateLimitMeterInMenuBar)
         #expect(GitHubReferenceMonitorSettings().enabled == false)
+        #expect(ActionsSettings().showActionsInMenu == false)
+        #expect(ActionsSettings().planTier == .free)
+        #expect(ActionsSettings().ownerFilter.isEmpty)
+        #expect(UserSettings().monitoredOwners.isEmpty)
+        #expect(GitHubPlanTier.free.includedMinutesPerMonth == 2000)
+        #expect(GitHubPlanTier.enterprise.concurrentJobs == 500)
 
         #expect(GlobalActivityScope.allActivity.label == "All activity")
         #expect(GlobalActivityScope.myActivity.label == "My activity")
@@ -58,5 +64,19 @@ struct UserSettingsCoverageTests {
         let filterIndex = try #require(customization.mainMenuOrder.firstIndex(of: .filters))
         #expect(statusIndex < rateIndex)
         #expect(rateIndex < filterIndex)
+    }
+
+    @Test
+    func `menu normalization keeps actions after rate limits`() throws {
+        var customization = MenuCustomization()
+        customization.mainMenuOrder.removeAll { $0 == .actionsLimits }
+
+        customization.normalize()
+
+        let rateIndex = try #require(customization.mainMenuOrder.firstIndex(of: .rateLimits))
+        let actionsIndex = try #require(customization.mainMenuOrder.firstIndex(of: .actionsLimits))
+        let filterIndex = try #require(customization.mainMenuOrder.firstIndex(of: .filters))
+        #expect(rateIndex < actionsIndex)
+        #expect(actionsIndex < filterIndex)
     }
 }

@@ -78,8 +78,34 @@ struct GitHubRestAPI {
         let token = try await tokenProvider()
         let baseURL = await self.apiHost()
         let url = baseURL.appending(path: "/user")
-        let (data, _) = try await authorizedGet(url: url, token: token)
+        let (data, _) = try await authorizedGet(url: url, token: token, useETag: false)
         return try GitHubDecoding.decode(CurrentUser.self, from: data)
+    }
+
+    func fetchUserOrganizations() async throws -> [String] {
+        let token = try await tokenProvider()
+        let baseURL = await self.apiHost()
+        let (data, _) = try await authorizedGet(
+            url: baseURL.appending(path: "/user/orgs"),
+            token: token,
+            allowedStatuses: [200, 304],
+            useETag: false
+        )
+        let orgs = try GitHubDecoding.decode([UserOrganization].self, from: data)
+        return orgs.map(\.login)
+    }
+
+    func fetchOrganizationPlan(org: String) async throws -> String? {
+        let token = try await tokenProvider()
+        let baseURL = await self.apiHost()
+        let (data, _) = try await authorizedGet(
+            url: baseURL.appending(path: "/orgs/\(org)"),
+            token: token,
+            allowedStatuses: [200, 304, 403, 404],
+            useETag: false
+        )
+        let detail = try? GitHubDecoding.decode(OrganizationDetail.self, from: data)
+        return detail?.plan?.name
     }
 
     func rateLimitResources() async throws -> RateLimitResourcesSnapshot {

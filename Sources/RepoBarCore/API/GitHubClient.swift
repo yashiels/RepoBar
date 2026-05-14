@@ -288,7 +288,15 @@ public actor GitHubClient {
 
     public func currentUser() async throws -> UserIdentity {
         let user = try await self.restAPI.fetchCurrentUser()
-        return UserIdentity(username: user.login, host: self.webHostURL())
+        return UserIdentity(username: user.login, host: self.webHostURL(), planName: user.plan?.name)
+    }
+
+    public func userOrganizations() async throws -> [String] {
+        try await self.restAPI.fetchUserOrganizations()
+    }
+
+    public func organizationPlan(org: String) async throws -> String? {
+        try await self.restAPI.fetchOrganizationPlan(org: org)
     }
 
     public func searchRepositories(matching query: String) async throws -> [Repository] {
@@ -298,6 +306,32 @@ public actor GitHubClient {
             source: "searchRepositories"
         )
         return items.map { Repository.from(item: $0) }
+    }
+
+    // MARK: - Actions & Runners
+
+    public func selfHostedRunners(owner: String, repo: String? = nil) async throws -> ActionsRunnerInfo {
+        try await self.restAPI.selfHostedRunners(owner: owner, repo: repo)
+    }
+
+    public func actionsQueueStatus(owner: String, name: String) async throws -> ActionsQueueStatus {
+        try await self.restAPI.actionsQueueStatus(owner: owner, name: name)
+    }
+
+    public func actionsBillingUsage(owner: String, isOrg: Bool) async throws -> ActionsUsageInfo {
+        try await self.restAPI.actionsBillingUsage(owner: owner, isOrg: isOrg)
+    }
+
+    public func hostedRunnerLimits(org: String) async throws -> HostedRunnerLimits {
+        try await self.restAPI.hostedRunnerLimits(org: org)
+    }
+
+    public func actionsCacheUsage(org: String) async throws -> ActionsCacheUsage {
+        try await self.restAPI.actionsCacheUsage(org: org)
+    }
+
+    public func artifactRetentionPolicy(org: String) async throws -> ArtifactRetentionPolicy {
+        try await self.restAPI.artifactRetentionPolicy(org: org)
     }
 
     public func clearCache() async {

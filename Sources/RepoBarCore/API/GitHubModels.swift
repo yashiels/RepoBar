@@ -3,10 +3,38 @@ import Foundation
 struct CurrentUser: Decodable {
     let login: String
     let htmlUrl: String
+    let plan: Plan?
+
+    struct Plan: Decodable {
+        let name: String
+    }
 
     enum CodingKeys: String, CodingKey {
         case login
         case htmlUrl = "html_url"
+        case plan
+    }
+}
+
+struct UserOrganization: Decodable {
+    let login: String
+
+    enum CodingKeys: String, CodingKey {
+        case login
+    }
+}
+
+struct OrganizationDetail: Decodable {
+    let login: String
+    let plan: Plan?
+
+    struct Plan: Decodable {
+        let name: String
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case login
+        case plan
     }
 }
 
@@ -52,6 +80,7 @@ struct ActionsRunsResponse: Decodable {
         let createdAt: Date?
         let updatedAt: Date?
         let actor: Actor?
+        let repository: Repository?
 
         struct Actor: Decodable {
             let login: String
@@ -60,6 +89,14 @@ struct ActionsRunsResponse: Decodable {
             enum CodingKeys: String, CodingKey {
                 case login
                 case avatarUrl = "avatar_url"
+            }
+        }
+
+        struct Repository: Decodable {
+            let fullName: String
+
+            enum CodingKeys: String, CodingKey {
+                case fullName = "full_name"
             }
         }
 
@@ -76,6 +113,7 @@ struct ActionsRunsResponse: Decodable {
             case createdAt = "created_at"
             case updatedAt = "updated_at"
             case actor
+            case repository
         }
     }
 }

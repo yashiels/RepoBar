@@ -19,6 +19,7 @@ struct MenuBuildSignature: Hashable {
     let heatmapRangeStart: TimeInterval
     let heatmapRangeEnd: TimeInterval
     let reposDigest: Int
+    let actionsDigest: Int
     let timeBucket: Int
 }
 
@@ -122,6 +123,70 @@ struct ActiveRateLimitSignature: Hashable {
         self.remaining = row.remaining
         self.reset = row.resetAt
         self.lastError = row.lastError
+    }
+}
+
+struct ActionsSnapshotSignature: Hashable {
+    let org: String
+    let planTier: GitHubPlanTier
+    let isOrg: Bool
+    let minutesUsed: Int?
+    let minutesIncluded: Int?
+    let runnerCount: Int
+    let onlineRunners: Int
+    let busyRunners: Int
+    let displayedRunners: [DisplayedRunnerSignature]
+    let runnerScannedRepositoryCount: Int
+    let runnerTotalRepositoryCount: Int
+    let inProgressJobs: Int
+    let queuedJobs: Int
+    let runIDs: [Int]
+    let cacheSizeBytes: Int?
+    let cacheCount: Int?
+    let retentionDays: Int?
+
+    init(_ snapshot: ActionsOrgSnapshot) {
+        self.org = snapshot.org
+        self.planTier = snapshot.planTier
+        self.isOrg = snapshot.isOrg
+        self.minutesUsed = snapshot.minutesUsed
+        self.minutesIncluded = snapshot.minutesIncluded
+        self.runnerCount = snapshot.runners?.totalCount ?? 0
+        self.onlineRunners = snapshot.runners?.onlineCount ?? 0
+        self.busyRunners = snapshot.runners?.busyCount ?? 0
+        self.displayedRunners = snapshot.runners?.runners.prefix(10).map(DisplayedRunnerSignature.init) ?? []
+        self.runnerScannedRepositoryCount = snapshot.runners?.scannedRepositoryCount ?? 0
+        self.runnerTotalRepositoryCount = snapshot.runners?.totalRepositoryCount ?? 0
+        self.inProgressJobs = snapshot.queueStatus?.inProgressCount ?? 0
+        self.queuedJobs = snapshot.queueStatus?.queuedCount ?? 0
+        self.runIDs = snapshot.queueStatus?.runs.map(\.id) ?? []
+        self.cacheSizeBytes = snapshot.cacheUsage?.totalCachesSizeBytes
+        self.cacheCount = snapshot.cacheUsage?.totalCachesCount
+        self.retentionDays = snapshot.artifactRetention?.retentionDays
+    }
+
+    static func digest(for snapshots: [ActionsOrgSnapshot]) -> Int {
+        var hasher = Hasher()
+        snapshots.map(Self.init).forEach { hasher.combine($0) }
+        return hasher.finalize()
+    }
+}
+
+struct DisplayedRunnerSignature: Hashable {
+    let id: Int
+    let name: String
+    let os: String
+    let status: String
+    let busy: Bool
+    let labels: [String]
+
+    init(_ runner: RunnerSummary) {
+        self.id = runner.id
+        self.name = runner.name
+        self.os = runner.os
+        self.status = runner.status
+        self.busy = runner.busy
+        self.labels = Array(runner.labels.prefix(3))
     }
 }
 
