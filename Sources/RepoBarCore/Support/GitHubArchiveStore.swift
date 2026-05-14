@@ -194,7 +194,10 @@ public enum GitHubArchiveStore {
                 throw GitHubArchiveStoreError.missingSnapshotSource(resolvedSource.name)
             }
 
-            resolvedSource.localRepositoryPath = self.defaultSnapshotRepositoryPath(name: resolvedSource.name)
+            resolvedSource.localRepositoryPath = self.defaultSnapshotRepositoryPath(
+                name: resolvedSource.name,
+                repositoryIdentifier: resolvedSource.remoteURL
+            )
         }
 
         guard let rawRepoPath = resolvedSource.localRepositoryPath?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -214,8 +217,8 @@ public enum GitHubArchiveStore {
         return GitHubArchiveUpdateResult(source: resolvedSource, importResult: result)
     }
 
-    public static func defaultSnapshotRepositoryPath(name: String) -> String {
-        let fileName = self.sanitizedArchiveName(name)
+    public static func defaultSnapshotRepositoryPath(name: String, repositoryIdentifier: String? = nil) -> String {
+        let fileName = self.archiveFileName(name: name, repositoryIdentifier: repositoryIdentifier)
         let base = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first?
@@ -225,6 +228,87 @@ public enum GitHubArchiveStore {
             .path
 
         return base ?? "~/Library/Application Support/RepoBar/Archives/\(fileName)-snapshot"
+    }
+
+    public static func defaultDatabasePath(name: String, repositoryIdentifier: String? = nil) -> String {
+        let fileName = self.archiveFileName(name: name, repositoryIdentifier: repositoryIdentifier)
+        let base = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first?
+            .appending(path: "RepoBar", directoryHint: .isDirectory)
+            .appending(path: "Archives", directoryHint: .isDirectory)
+            .appending(path: "\(fileName).sqlite", directoryHint: .notDirectory)
+            .path
+
+        return base ?? "~/Library/Application Support/RepoBar/Archives/\(fileName).sqlite"
+    }
+
+    public static func source(repository rawRepository: String) -> GitHubArchiveSource? {
+        let repository = self.trimmedRepository(rawRepository)
+        guard repository.isEmpty == false else { return nil }
+
+        let name = self.archiveName(from: repository)
+        let remoteURL = self.normalizedRemoteURL(repository: repository)
+        let identifier = remoteURL ?? PathFormatter.expandTilde(repository)
+        return GitHubArchiveSource(
+            name: name,
+            localRepositoryPath: remoteURL == nil ? PathFormatter.expandTilde(repository) : nil,
+            remoteURL: remoteURL,
+            importedDatabasePath: self.defaultDatabasePath(name: name, repositoryIdentifier: identifier)
+        )
+    }
+
+    public static func sameArchiveLocation(_ lhs: GitHubArchiveSource, _ rhs: GitHubArchiveSource) -> Bool {
+        if let lhsRemote = lhs.remoteURL, let rhsRemote = rhs.remoteURL, lhsRemote == rhsRemote {
+            return true
+        }
+
+        if let lhsPath = lhs.localRepositoryPath, let rhsPath = rhs.localRepositoryPath {
+            return PathFormatter.expandTilde(lhsPath) == PathFormatter.expandTilde(rhsPath)
+        }
+
+        return false
+    }
+
+    public static func archiveName(from rawRepository: String) -> String {
+        let repository = self.trimmedRepository(rawRepository)
+        let path = self.repositoryPathComponent(from: repository)
+        let strippedPath = self.strippingGitSuffix(path)
+        let parts = strippedPath
+            .split(separator: "/", omittingEmptySubsequences: true)
+            .map(String.init)
+
+        if self.normalizedRemoteURL(repository: repository) != nil, parts.count >= 2 {
+            return "\(parts[parts.count - 2])/\(parts[parts.count - 1])"
+        }
+
+        return parts.last.map(self.strippingGitSuffix) ?? "archive"
+    }
+
+    public static func normalizedRemoteURL(repository rawRepository: String) -> String? {
+        let repository = self.trimmedRepository(rawRepository)
+        let lowercaseRepository = repository.lowercased()
+        let hasRemotePrefix = lowercaseRepository.hasPrefix("https://")
+            || lowercaseRepository.hasPrefix("http://")
+            || lowercaseRepository.hasPrefix("ssh://")
+            || lowercaseRepository.hasPrefix("git://")
+            || repository.hasPrefix("git@")
+        if hasRemotePrefix {
+            return repository
+        }
+
+        let parts = repository.split(separator: "/", omittingEmptySubsequences: true)
+        guard parts.count == 2,
+              repository.hasPrefix("/") == false,
+              repository.hasPrefix(".") == false,
+              repository.contains(":") == false,
+              repository.contains(" ") == false
+        else {
+            return nil
+        }
+
+        let path = repository.hasSuffix(".git") ? repository : "\(repository).git"
+        return "https://github.com/\(path)"
     }
 
     public static func sanitizedArchiveName(_ name: String) -> String {
@@ -241,6 +325,54 @@ public enum GitHubArchiveStore {
 
     public static func archiveDateString(_ date: Date) -> String {
         ISO8601DateFormatter().string(from: date)
+    }
+
+    private static func archiveFileName(name: String, repositoryIdentifier: String?) -> String {
+        let base = self.sanitizedArchiveName(name)
+        guard let repositoryIdentifier = repositoryIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines),
+              repositoryIdentifier.isEmpty == false
+        else {
+            return base
+        }
+
+        return "\(base)-\(self.stableIdentifierSuffix(repositoryIdentifier))"
+    }
+
+    private static func stableIdentifierSuffix(_ value: String) -> String {
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in value.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+
+        return String(hash, radix: 16)
+    }
+
+    private static func trimmedRepository(_ repository: String) -> String {
+        var value = repository.trimmingCharacters(in: .whitespacesAndNewlines)
+        while value.count > 1, value.hasSuffix("/") {
+            value.removeLast()
+        }
+        return value
+    }
+
+    private static func repositoryPathComponent(from repository: String) -> String {
+        if let url = URL(string: repository), url.host?.isEmpty == false {
+            return url.path
+        }
+
+        if let separator = repository.firstIndex(of: ":") {
+            let prefix = repository[..<separator]
+            if prefix.contains("@") {
+                return String(repository[repository.index(after: separator)...])
+            }
+        }
+
+        return repository
+    }
+
+    private static func strippingGitSuffix(_ value: String) -> String {
+        value.hasSuffix(".git") ? String(value.dropLast(4)) : value
     }
 
     private static func importMetadata(databasePath: String) -> ImportMetadata? {

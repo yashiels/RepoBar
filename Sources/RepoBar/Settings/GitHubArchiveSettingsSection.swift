@@ -5,10 +5,7 @@ import SwiftUI
 struct GitHubArchiveSettingsSection: View {
     @Binding var settings: GitHubArchiveSettings
     let persist: () -> Void
-    @State private var name = ""
-    @State private var repositoryPath = ""
-    @State private var remoteURL = ""
-    @State private var databasePath = ""
+    @State private var repository = ""
     @State private var statuses: [String: GitHubArchiveSourceStatus] = [:]
     @State private var updatingIDs = Set<String>()
     @State private var updateError: String?
@@ -33,32 +30,25 @@ struct GitHubArchiveSettingsSection: View {
                     .foregroundStyle(.red)
             }
 
-            Divider()
+            LabeledContent("Repo") {
+                HStack {
+                    TextField("owner/repo, URL, or local path", text: self.$repository)
+                        .textFieldStyle(.roundedBorder)
 
-            TextField("Name", text: self.$name)
-            TextField("Snapshot repo path", text: self.$repositoryPath)
-            TextField("Remote URL", text: self.$remoteURL)
-            TextField("Imported SQLite path", text: self.$databasePath)
+                    Button("Add Repo") {
+                        self.addArchive()
+                    }
+                    .disabled(!self.canAdd)
 
-            HStack {
-                Button("Add Archive") {
-                    self.addArchive()
-                }
-                .disabled(!self.canAdd)
-
-                Spacer()
-
-                Button("Choose Repo…") {
-                    self.chooseDirectory { self.repositoryPath = $0 }
-                }
-                Button("Choose DB…") {
-                    self.chooseFile { self.databasePath = $0 }
+                    Button("Choose Repo…") {
+                        self.chooseDirectory { self.repository = $0 }
+                    }
                 }
             }
         } header: {
             Text("GitHub Archives")
         } footer: {
-            Text("RepoBar-owned backup sources. Menu reads never edit crawler config or pull Git repos while opening.")
+            Text("Point RepoBar at a snapshot repository. RepoBar manages the imported database internally and uses it only when GitHub is rate limited.")
         }
         .onAppear {
             self.refreshStatuses()
@@ -79,10 +69,11 @@ struct GitHubArchiveSettingsSection: View {
     }
 
     private var canAdd: Bool {
-        let trimmedName = self.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let hasSource = self.repositoryPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            || self.remoteURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-        return trimmedName.isEmpty == false && hasSource
+        guard let source = GitHubArchiveStore.source(repository: self.repository) else {
+            return false
+        }
+
+        return self.settings.sources.contains { self.matches($0, source) } == false
     }
 
     private func row(for source: GitHubArchiveSource) -> some View {
@@ -143,9 +134,8 @@ struct GitHubArchiveSettingsSection: View {
     }
 
     private func detailLine(for source: GitHubArchiveSource) -> String {
-        let repo = source.localRepositoryPath.map(PathFormatter.displayString) ?? "-"
-        let db = PathFormatter.displayString(source.importedDatabasePath)
-        return "repo: \(repo) · db: \(db)"
+        let repo = source.remoteURL ?? source.localRepositoryPath.map(PathFormatter.displayString) ?? "-"
+        return "repo: \(repo)"
     }
 
     private func statusLine(for status: GitHubArchiveSourceStatus) -> String {
@@ -163,23 +153,12 @@ struct GitHubArchiveSettingsSection: View {
     }
 
     private func addArchive() {
-        let trimmedName = self.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmedName.isEmpty == false else { return }
+        guard let source = GitHubArchiveStore.source(repository: self.repository),
+              self.settings.sources.contains(where: { self.matches($0, source) }) == false
+        else { return }
 
-        let repo = self.repositoryPath.trimmingCharacters(in: .whitespacesAndNewlines)
-        let remote = self.remoteURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        let db = self.databasePath.trimmingCharacters(in: .whitespacesAndNewlines)
-        let source = GitHubArchiveSource(
-            name: trimmedName,
-            localRepositoryPath: repo.isEmpty ? nil : PathFormatter.expandTilde(repo),
-            remoteURL: remote.isEmpty ? nil : remote,
-            importedDatabasePath: PathFormatter.expandTilde(db.isEmpty ? self.defaultDatabasePath(name: trimmedName) : db)
-        )
         self.settings.sources.append(source)
-        self.name = ""
-        self.repositoryPath = ""
-        self.remoteURL = ""
-        self.databasePath = ""
+        self.repository = ""
         self.persist()
         self.refreshStatuses()
     }
@@ -223,37 +202,7 @@ struct GitHubArchiveSettingsSection: View {
         }
     }
 
-    private func chooseFile(_ apply: (String) -> Void) {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            apply(PathFormatter.abbreviateHome(url.resolvingSymlinksInPath().path))
-        }
-    }
-
-    private func defaultDatabasePath(name: String) -> String {
-        let fileName = Self.safeFileName(name)
-        let url = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first?
-            .appending(path: "RepoBar", directoryHint: .isDirectory)
-            .appending(path: "Archives", directoryHint: .isDirectory)
-            .appending(path: "\(fileName).sqlite", directoryHint: .notDirectory)
-
-        return url?.path ?? "~/Library/Application Support/RepoBar/Archives/\(fileName).sqlite"
-    }
-
-    private static func safeFileName(_ name: String) -> String {
-        let mapped = name.lowercased().unicodeScalars.map { scalar in
-            CharacterSet.alphanumerics.contains(scalar)
-                || scalar == Unicode.Scalar("-")
-                || scalar == Unicode.Scalar("_")
-                ? Character(scalar)
-                : "-"
-        }
-        let value = String(mapped).trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-        return value.isEmpty ? "archive" : value
+    private func matches(_ existing: GitHubArchiveSource, _ candidate: GitHubArchiveSource) -> Bool {
+        GitHubArchiveStore.sameArchiveLocation(existing, candidate)
     }
 }

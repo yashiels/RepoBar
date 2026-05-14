@@ -79,4 +79,41 @@ struct UserSettingsCoverageTests {
         #expect(rateIndex < actionsIndex)
         #expect(actionsIndex < filterIndex)
     }
+
+    @Test
+    func `archive source derives internal fields from repo`() throws {
+        let shorthand = try #require(GitHubArchiveStore.source(repository: "openclaw/archive"))
+        #expect(shorthand.name == "openclaw/archive")
+        #expect(shorthand.remoteURL == "https://github.com/openclaw/archive.git")
+        #expect(shorthand.localRepositoryPath == nil)
+        #expect(shorthand.importedDatabasePath.contains("/RepoBar/Archives/openclaw-archive-"))
+        #expect(shorthand.importedDatabasePath.hasSuffix(".sqlite"))
+
+        let ssh = try #require(GitHubArchiveStore.source(repository: "git@github.com:steipete/RepoBar.git"))
+        #expect(ssh.name == "steipete/RepoBar")
+        #expect(ssh.remoteURL == "git@github.com:steipete/RepoBar.git")
+
+        let local = try #require(GitHubArchiveStore.source(repository: "/tmp/RepoBarArchive.git/"))
+        #expect(local.name == "RepoBarArchive")
+        #expect(local.remoteURL == nil)
+        #expect(local.localRepositoryPath == "/tmp/RepoBarArchive.git")
+
+        let colliding = try #require(GitHubArchiveStore.source(repository: "/tmp/openclaw-archive"))
+        #expect(colliding.name == "openclaw-archive")
+        #expect(colliding.importedDatabasePath != shorthand.importedDatabasePath)
+    }
+
+    @Test
+    func `archive location matching ignores nil optionals`() throws {
+        let firstRemote = try #require(GitHubArchiveStore.source(repository: "openclaw/archive"))
+        let secondRemote = try #require(GitHubArchiveStore.source(repository: "steipete/RepoBar"))
+        let firstLocal = try #require(GitHubArchiveStore.source(repository: "/tmp/archive-one"))
+        let secondLocal = try #require(GitHubArchiveStore.source(repository: "/tmp/archive-two"))
+        let sameLeafLocal = try #require(GitHubArchiveStore.source(repository: "/Volumes/backup/archive-one"))
+
+        #expect(GitHubArchiveStore.sameArchiveLocation(firstRemote, firstRemote))
+        #expect(GitHubArchiveStore.sameArchiveLocation(firstRemote, secondRemote) == false)
+        #expect(GitHubArchiveStore.sameArchiveLocation(firstLocal, secondLocal) == false)
+        #expect(GitHubArchiveStore.sameArchiveLocation(firstLocal, sameLeafLocal) == false)
+    }
 }
