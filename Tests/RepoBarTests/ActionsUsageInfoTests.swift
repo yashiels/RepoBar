@@ -19,6 +19,20 @@ struct ActionsUsageInfoTests {
     }
 
     @Test
+    func `current month minutes bucket date only rows in UTC`() throws {
+        let previousTimeZone = NSTimeZone.default
+        NSTimeZone.default = try #require(TimeZone(secondsFromGMT: -8))
+        defer { NSTimeZone.default = previousTimeZone }
+
+        let usage = ActionsUsageInfo(
+            items: [Self.item(date: "2026-05-01", quantity: 12)],
+            fetchedAt: Self.date("2026-05-01T12:00:00Z")
+        )
+
+        #expect(usage.minutesUsedInCurrentMonth(now: Self.date("2026-05-01T12:00:00Z")) == 12)
+    }
+
+    @Test
     func `usage date parser accepts date only and internet dates`() {
         #expect(ActionsUsageInfo.date(fromUsageDate: "2026-05-01") == Self.date("2026-05-01T00:00:00Z"))
         #expect(ActionsUsageInfo.date(fromUsageDate: "2026-05-01T12:34:56Z") == Self.date("2026-05-01T12:34:56Z"))

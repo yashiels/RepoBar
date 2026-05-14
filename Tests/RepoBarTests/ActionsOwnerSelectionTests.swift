@@ -1,3 +1,4 @@
+import Foundation
 @testable import RepoBar
 @testable import RepoBarCore
 import Testing
@@ -36,6 +37,21 @@ struct ActionsOwnerSelectionTests {
 
         #expect(owners.map(\.name) == ["steipete", "openclaw"])
         #expect(owners.map(\.isOrg) == [false, true])
+    }
+
+    @Test @MainActor
+    func `falls back to repository runner scan when org runner list is empty`() {
+        let repos = [Self.repo(owner: "openclaw", name: "clawsweeper")]
+        let emptyOrgRunners = ActionsRunnerInfo(totalCount: 0, runners: [], fetchedAt: Date())
+        let orgRunners = ActionsRunnerInfo(
+            totalCount: 1,
+            runners: [RunnerSummary(id: 1, name: "mac-mini", os: "macOS", status: "online", busy: false, labels: [])],
+            fetchedAt: Date()
+        )
+
+        #expect(AppState.shouldScanRepositoryRunners(after: emptyOrgRunners, repos: repos))
+        #expect(!AppState.shouldScanRepositoryRunners(after: orgRunners, repos: repos))
+        #expect(!AppState.shouldScanRepositoryRunners(after: emptyOrgRunners, repos: []))
     }
 
     private static func repo(owner: String, name: String) -> Repository {

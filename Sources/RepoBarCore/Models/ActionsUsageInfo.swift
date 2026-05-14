@@ -22,19 +22,25 @@ public struct ActionsUsageInfo: Sendable, Equatable {
     }
 
     public func minutesUsedInCurrentMonth(now: Date = Date()) -> Double {
-        let calendar = Calendar(identifier: .gregorian)
-        let currentYear = calendar.component(.year, from: now)
-        let currentMonth = calendar.component(.month, from: now)
+        let monthFormatter = Self.utcMonthFormatter()
+        let currentMonth = monthFormatter.string(from: now)
         return self.items
             .filter { item in
                 guard item.unitType.lowercased() == "minutes" else { return false }
                 guard let date = Self.date(fromUsageDate: item.date) else { return false }
 
-                let year = calendar.component(.year, from: date)
-                let month = calendar.component(.month, from: date)
-                return year == currentYear && month == currentMonth
+                return monthFormatter.string(from: date) == currentMonth
             }
             .reduce(0) { $0 + $1.quantity }
+    }
+
+    private static func utcMonthFormatter() -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .gmt
+        formatter.dateFormat = "yyyy-MM"
+        return formatter
     }
 
     static func date(fromUsageDate rawDate: String) -> Date? {
@@ -47,7 +53,7 @@ public struct ActionsUsageInfo: Sendable, Equatable {
         let dateOnlyFormatter = DateFormatter()
         dateOnlyFormatter.calendar = Calendar(identifier: .gregorian)
         dateOnlyFormatter.locale = Locale(identifier: "en_US_POSIX")
-        dateOnlyFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        dateOnlyFormatter.timeZone = .gmt
         dateOnlyFormatter.dateFormat = "yyyy-MM-dd"
         return dateOnlyFormatter.date(from: rawDate)
     }

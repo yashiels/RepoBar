@@ -99,10 +99,11 @@ extension AppState {
         owner: String,
         repos: [Repository]
     ) async -> ActionsRunnerInfo? {
-        if let orgRunners = try? await github.selfHostedRunners(owner: owner) {
+        let orgRunners = try? await github.selfHostedRunners(owner: owner)
+        if !Self.shouldScanRepositoryRunners(after: orgRunners, repos: repos) {
             return orgRunners
         }
-        guard !repos.isEmpty else { return nil }
+        guard !repos.isEmpty else { return orgRunners }
 
         let sample = Array(repos.prefix(5))
         var totalCount = 0
@@ -128,6 +129,13 @@ extension AppState {
             scannedRepositoryCount: sample.count,
             totalRepositoryCount: repos.count
         )
+    }
+
+    static func shouldScanRepositoryRunners(after orgRunners: ActionsRunnerInfo?, repos: [Repository]) -> Bool {
+        guard !repos.isEmpty else { return false }
+        guard let orgRunners else { return true }
+
+        return orgRunners.totalCount == 0 && orgRunners.runners.isEmpty
     }
 
     private static func fetchQueueStatus(
