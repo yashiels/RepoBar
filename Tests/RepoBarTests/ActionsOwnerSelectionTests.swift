@@ -52,7 +52,7 @@ struct ActionsOwnerSelectionTests {
     }
 
     @Test @MainActor
-    func `falls back to repository runner scan when org runner list is empty`() {
+    func `scans repository runners whenever repositories are available`() {
         let repos = [Self.repo(owner: "openclaw", name: "clawsweeper")]
         let emptyOrgRunners = ActionsRunnerInfo(totalCount: 0, runners: [], fetchedAt: Date())
         let orgRunners = ActionsRunnerInfo(
@@ -62,8 +62,38 @@ struct ActionsOwnerSelectionTests {
         )
 
         #expect(AppState.shouldScanRepositoryRunners(after: emptyOrgRunners, repos: repos))
-        #expect(!AppState.shouldScanRepositoryRunners(after: orgRunners, repos: repos))
+        #expect(AppState.shouldScanRepositoryRunners(after: orgRunners, repos: repos))
         #expect(!AppState.shouldScanRepositoryRunners(after: emptyOrgRunners, repos: []))
+    }
+
+    @Test @MainActor
+    func `combines org and repository scoped runners`() throws {
+        let now = Date()
+        let orgRunners = ActionsRunnerInfo(
+            totalCount: 1,
+            runners: [RunnerSummary(id: 1, name: "org-mac", os: "macOS", status: "online", busy: false, labels: [])],
+            fetchedAt: now
+        )
+        let repoRunners = ActionsRunnerInfo(
+            totalCount: 2,
+            runners: [
+                RunnerSummary(id: 2, name: "repo-linux", os: "Linux", status: "online", busy: true, labels: []),
+                RunnerSummary(id: 3, name: "repo-win", os: "Windows", status: "offline", busy: false, labels: [])
+            ],
+            fetchedAt: now
+        )
+
+        let combined = try #require(AppState.combinedRunnerInfo(
+            orgRunners: orgRunners,
+            repositoryRunners: [repoRunners],
+            scannedRepositoryCount: 5,
+            totalRepositoryCount: 12,
+            fetchedAt: now
+        ))
+
+        #expect(combined.totalCount == 3)
+        #expect(combined.runners.map(\.name) == ["org-mac", "repo-linux", "repo-win"])
+        #expect(combined.repositorySampleDescription == "Sampled 5 of 12 repos")
     }
 
     private static func repo(owner: String, name: String) -> Repository {

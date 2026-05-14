@@ -142,11 +142,9 @@ extension AppState {
         if !Self.shouldScanRepositoryRunners(after: orgRunners, repos: repos) {
             return orgRunners
         }
-        guard !repos.isEmpty else { return orgRunners }
 
         let sample = Array(repos.prefix(5))
-        var totalCount = 0
-        var runners: [RunnerSummary] = []
+        var repositoryRunners: [ActionsRunnerInfo] = []
         let now = Date()
 
         for repo in sample {
@@ -154,27 +152,48 @@ extension AppState {
                 continue
             }
 
-            totalCount += info.totalCount
-            runners.append(contentsOf: info.runners)
+            repositoryRunners.append(info)
         }
 
-        let isSampled = repos.count > sample.count
+        return Self.combinedRunnerInfo(
+            orgRunners: orgRunners,
+            repositoryRunners: repositoryRunners,
+            scannedRepositoryCount: sample.count,
+            totalRepositoryCount: repos.count,
+            fetchedAt: now
+        )
+    }
+
+    static func shouldScanRepositoryRunners(after _: ActionsRunnerInfo?, repos: [Repository]) -> Bool {
+        guard !repos.isEmpty else { return false }
+
+        return true
+    }
+
+    static func combinedRunnerInfo(
+        orgRunners: ActionsRunnerInfo?,
+        repositoryRunners: [ActionsRunnerInfo],
+        scannedRepositoryCount: Int,
+        totalRepositoryCount: Int,
+        fetchedAt: Date
+    ) -> ActionsRunnerInfo? {
+        let repositoryTotalCount = repositoryRunners.reduce(0) { $0 + $1.totalCount }
+        let totalCount = (orgRunners?.totalCount ?? 0) + repositoryTotalCount
+        let isSampled = totalRepositoryCount > scannedRepositoryCount && scannedRepositoryCount > 0
         guard totalCount > 0 || isSampled else { return nil }
+
+        var seenRunnerIDs: Set<Int> = []
+        let runners = ((orgRunners?.runners ?? []) + repositoryRunners.flatMap(\.runners)).filter { runner in
+            seenRunnerIDs.insert(runner.id).inserted
+        }
 
         return ActionsRunnerInfo(
             totalCount: totalCount,
             runners: runners,
-            fetchedAt: now,
-            scannedRepositoryCount: sample.count,
-            totalRepositoryCount: repos.count
+            fetchedAt: fetchedAt,
+            scannedRepositoryCount: scannedRepositoryCount,
+            totalRepositoryCount: totalRepositoryCount
         )
-    }
-
-    static func shouldScanRepositoryRunners(after orgRunners: ActionsRunnerInfo?, repos: [Repository]) -> Bool {
-        guard !repos.isEmpty else { return false }
-        guard let orgRunners else { return true }
-
-        return orgRunners.totalCount == 0 && orgRunners.runners.isEmpty
     }
 
     private static func fetchQueueStatus(
