@@ -104,8 +104,9 @@ extension GitHubRestAPI {
         let (data, _) = try await authorizedGet(
             url: components.url!,
             token: token,
-            allowedStatuses: [200, 304, 403, 404],
-            headers: ["X-GitHub-Api-Version": "2026-03-10"]
+            allowedStatuses: [200],
+            headers: ["X-GitHub-Api-Version": "2026-03-10"],
+            useETag: false
         )
         let decoded = try GitHubDecoding.decode(BillingUsageResponse.self, from: data)
         return ActionsUsageInfo(items: decoded.usageItems.map(Self.usageItem(from:)), fetchedAt: now)
