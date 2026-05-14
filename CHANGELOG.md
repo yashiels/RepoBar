@@ -1,25 +1,25 @@
 # Changelog
 
-## 0.5.3 - Unreleased
+## 0.6.0 - Unreleased
 
-- Replace the menu bar GitHub rate-limit bar glyph with a circular quota meter so RepoBar is easier to distinguish from other menu bar apps.
 - Add a full Issue Navigator window for clipboard-aware issue/PR lookup, scoped repository search, keyboard selection, copy/open actions, and inline GitHub previews.
-- Show RepoBar in the Dock while the Issue Navigator window is open, then return to menu-bar-only mode when it closes.
-- Refine Issue Navigator sidebar chrome with a translucent material sidebar and subtler native split-view divider.
-- Keep Issue Navigator all-repository searches usable when individual repository searches fail, and show GitHub response details instead of a generic client error.
-- Cap Issue Navigator all-repository search fan-out, respect the selected issue/PR filter for pasted references, and hide the navigator while signed out.
+- Add opt-in GitHub pull request notifications for pinned repositories, with browser or Issue Navigator click handling (thanks @Whiteknight07).
+- Add an opt-in Actions & Runners menu section for GitHub Actions queue, billing usage, cache, retention, and runner status, with settings to pin the owners RepoBar monitors (thanks @yashiels).
+- Add a multi-reference menu action that opens the current GitHub reference set in Issue Navigator.
+- Recognize copied GitHub reference lists that write pull requests as `owner/repo #123`.
+- Preserve pasted GitHub reference list order in Issue Navigator and ignore incidental references inside list descriptions.
+- Show issue, pull request, commit, or workflow run identifiers before titles in the Issue Navigator sidebar.
 - Sort Issue Navigator rows by latest update time, choose recent repositories using the active issue/PR filter, and surface scoped repository load failures.
+- Cap Issue Navigator all-repository search fan-out, respect the selected issue/PR filter for pasted references, and hide the navigator while signed out.
 - Prevent canceled Issue Navigator searches from overwriting newer results and preserve merged pull request state in text search results.
 - Keep Issue Navigator typing from opening the selected result, avoid public GitHub fallback before repository inventory loads, and make quick close/reopen cleanup safe.
-- Add a multi-reference menu action that opens the current GitHub reference set in Issue Navigator.
-- Show issue, pull request, commit, or workflow run identifiers before titles in the Issue Navigator sidebar.
-- Preserve pasted GitHub reference list order in Issue Navigator and ignore incidental references inside list descriptions.
-- Recognize copied GitHub reference lists that write pull requests as `owner/repo #123`.
-- Add an opt-in Actions & Runners menu section for GitHub Actions queue, billing usage, cache, retention, and runner status, with settings to pin the owners RepoBar monitors (thanks @yashiels).
-- Add opt-in GitHub pull request notifications for pinned repositories, with browser or Issue Navigator click handling (thanks @Whiteknight07).
+- Keep Issue Navigator all-repository searches usable when individual repository searches fail, and show GitHub response details instead of a generic client error.
+- Show RepoBar in the Dock while the Issue Navigator window is open, then return to menu-bar-only mode when it closes.
+- Open Issue Navigator wider by default so the GitHub preview has more usable space.
+- Refine Issue Navigator sidebar chrome with a translucent material sidebar and subtler native split-view divider.
 - Simplify GitHub Archives settings to accept one repository input while RepoBar manages derived labels and imported SQLite databases internally.
 - Harden RepoBar CLI validation and output for GitHub archives, local project roots, markdown images, settings, and copied GitHub references.
-- Open Issue Navigator wider by default so the GitHub preview has more usable space.
+- Replace the menu bar GitHub rate-limit bar glyph with a circular quota meter so RepoBar is easier to distinguish from other menu bar apps.
 - Fix RepoBar website mobile install cards so long commands and copy controls stay inline without horizontal overflow.
 
 ## 0.5.2 - 2026-05-11
