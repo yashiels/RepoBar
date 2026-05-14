@@ -158,6 +158,7 @@ struct ActionsQueueRowView: View {
 
     private var remainingPercent: Double {
         guard self.planTier.concurrentJobs > 0 else { return 100 }
+
         let pct = (1.0 - Double(self.queueStatus.totalActiveCount) / Double(self.planTier.concurrentJobs)) * 100
         return min(100, max(0, pct))
     }
@@ -245,7 +246,7 @@ struct ActionsCacheUsageRowView: View {
             Text("Cache")
                 .font(.callout)
             Spacer()
-            Text(Self.formatted(cacheUsage))
+            Text(Self.formatted(self.cacheUsage))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -276,7 +277,7 @@ struct ArtifactRetentionRowView: View {
             Text("Artifact retention")
                 .font(.callout)
             Spacer()
-            Text("\(retention.retentionDays) days")
+            Text("\(self.retention.retentionDays) days")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -320,6 +321,7 @@ struct ActionsMinutesRowView: View {
 
     private var remainingPercent: Double {
         guard self.minutesIncluded > 0 else { return 100 }
+
         let pct = (1.0 - Double(self.minutesUsed) / Double(self.minutesIncluded)) * 100
         return min(100, max(0, pct))
     }

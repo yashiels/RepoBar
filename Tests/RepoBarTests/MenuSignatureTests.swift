@@ -107,6 +107,7 @@ struct MenuSignatureTests {
             heatmapRangeStart: now.timeIntervalSinceReferenceDate,
             heatmapRangeEnd: now.timeIntervalSinceReferenceDate,
             reposDigest: RepoSignature.digest(for: [display]),
+            actionsDigest: 0,
             timeBucket: Int(now.timeIntervalSinceReferenceDate / 60)
         )
 
@@ -124,6 +125,7 @@ struct MenuSignatureTests {
             heatmapRangeStart: now.timeIntervalSinceReferenceDate,
             heatmapRangeEnd: now.timeIntervalSinceReferenceDate,
             reposDigest: RepoSignature.digest(for: [display]),
+            actionsDigest: 0,
             timeBucket: Int(now.timeIntervalSinceReferenceDate / 60)
         )
 

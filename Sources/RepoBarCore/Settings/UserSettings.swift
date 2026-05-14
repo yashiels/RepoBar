@@ -18,6 +18,7 @@ public struct UserSettings: Equatable, Codable {
     public var enterpriseHost: URL?
     public var loopbackPort: Int = 53682
     public var authMethod: AuthMethod = .oauth
+    public var monitoredOwners: [String] = []
     public var actions = ActionsSettings()
 
     public init() {}
@@ -41,6 +42,7 @@ public struct UserSettings: Equatable, Codable {
         case enterpriseHost
         case loopbackPort
         case authMethod
+        case monitoredOwners
         case actions
     }
 
@@ -66,6 +68,13 @@ public struct UserSettings: Equatable, Codable {
         self.loopbackPort = try container.decodeIfPresent(Int.self, forKey: .loopbackPort) ?? 53682
         self.authMethod = try container.decodeIfPresent(AuthMethod.self, forKey: .authMethod) ?? .oauth
         self.actions = try container.decodeIfPresent(ActionsSettings.self, forKey: .actions) ?? ActionsSettings()
+        let decodedOwners = try container.decodeIfPresent([String].self, forKey: .monitoredOwners) ?? []
+        self.monitoredOwners = OwnerFilter.normalize(decodedOwners.isEmpty ? self.actions.ownerFilter : decodedOwners)
+        if self.actions.showActionsInMenu {
+            self.menuCustomization.hiddenMainMenuItems.remove(.actionsLimits)
+        } else if container.contains(.actions) {
+            self.menuCustomization.hiddenMainMenuItems.insert(.actionsLimits)
+        }
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -87,16 +96,48 @@ public struct UserSettings: Equatable, Codable {
         try container.encodeIfPresent(self.enterpriseHost, forKey: .enterpriseHost)
         try container.encode(self.loopbackPort, forKey: .loopbackPort)
         try container.encode(self.authMethod, forKey: .authMethod)
+        try container.encode(OwnerFilter.normalize(self.monitoredOwners), forKey: .monitoredOwners)
         try container.encode(self.actions, forKey: .actions)
     }
 }
 
 public struct ActionsSettings: Equatable, Codable {
     public var planTier: GitHubPlanTier = .free
-    public var showActionsInMenu: Bool = true
+    public var showActionsInMenu = false
+    public var ownerFilter: [String] = []
     public var monitoredOrg: String?
 
     public init() {}
+
+    enum CodingKeys: String, CodingKey {
+        case planTier
+        case showActionsInMenu
+        case ownerFilter
+        case monitoredOrg
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.planTier = try container.decodeIfPresent(GitHubPlanTier.self, forKey: .planTier) ?? .free
+        self.showActionsInMenu = try container.decodeIfPresent(Bool.self, forKey: .showActionsInMenu) ?? false
+        let owners = try container.decodeIfPresent([String].self, forKey: .ownerFilter) ?? []
+        if !owners.isEmpty {
+            self.ownerFilter = OwnerFilter.normalize(owners)
+        } else if let monitoredOrg = try container.decodeIfPresent(String.self, forKey: .monitoredOrg) {
+            self.ownerFilter = OwnerFilter.normalize([monitoredOrg])
+        } else {
+            self.ownerFilter = []
+        }
+        self.monitoredOrg = try container.decodeIfPresent(String.self, forKey: .monitoredOrg)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.planTier, forKey: .planTier)
+        try container.encode(self.showActionsInMenu, forKey: .showActionsInMenu)
+        try container.encode(OwnerFilter.normalize(self.ownerFilter), forKey: .ownerFilter)
+        try container.encodeIfPresent(self.monitoredOrg, forKey: .monitoredOrg)
+    }
 }
 
 public enum AuthMethod: String, CaseIterable, Equatable, Codable, Sendable {

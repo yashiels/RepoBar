@@ -175,7 +175,7 @@ public enum RepoSubmenuItemID: String, CaseIterable, Codable, Hashable, Sendable
 }
 
 public struct MenuCustomization: Equatable, Codable, Hashable, Sendable {
-    public var hiddenMainMenuItems: Set<MainMenuItemID> = []
+    public var hiddenMainMenuItems: Set<MainMenuItemID> = [.actionsLimits]
     public var mainMenuOrder: [MainMenuItemID] = Self.defaultMainMenuOrder
     public var hiddenRepoSubmenuItems: Set<RepoSubmenuItemID> = []
     public var repoSubmenuOrder: [RepoSubmenuItemID] = Self.defaultRepoSubmenuOrder

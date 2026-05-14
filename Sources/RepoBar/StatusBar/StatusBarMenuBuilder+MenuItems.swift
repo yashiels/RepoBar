@@ -173,7 +173,7 @@ extension StatusBarMenuBuilder {
         )
     }
 
-    private func actionsLimitsSubmenu(session: Session, now: Date) -> NSMenu {
+    private func actionsLimitsSubmenu(session: Session, now _: Date) -> NSMenu {
         let submenu = NSMenu()
         submenu.autoenablesItems = false
         submenu.delegate = self.target
@@ -245,13 +245,13 @@ extension StatusBarMenuBuilder {
                 }
             }
 
-            if !snapshot.hasRunners && !snapshot.hasActiveJobs {
+            if !snapshot.hasRunners, !snapshot.hasActiveJobs {
                 submenu.addItem(self.infoItem("No active runners or jobs"))
             }
         }
 
         if snapshots.isEmpty {
-            submenu.addItem(self.infoItem("No organizations found"))
+            submenu.addItem(self.infoItem(session.account.isLoggedIn ? "Loading owners…" : "No owners found"))
         }
 
         return submenu
@@ -262,6 +262,7 @@ extension StatusBarMenuBuilder {
         let totalRunners = snapshots.compactMap(\.runners).reduce(0) { $0 + $1.totalCount }
         let onlineRunners = snapshots.compactMap(\.runners).reduce(0) { $0 + $1.onlineCount }
         let activeJobs = snapshots.compactMap(\.queueStatus).reduce(0) { $0 + $1.totalActiveCount }
+        let orgCount = snapshots.count(where: \.isOrg)
 
         var parts: [String] = []
         if totalRunners > 0 {
@@ -271,7 +272,14 @@ extension StatusBarMenuBuilder {
             parts.append("\(activeJobs) jobs active")
         }
         if parts.isEmpty {
-            parts.append("\(snapshots.count) org\(snapshots.count == 1 ? "" : "s")")
+            if snapshots.isEmpty, session.account.isLoggedIn {
+                parts.append("Loading owners")
+            } else if orgCount > 0 {
+                let ownerCount = snapshots.count
+                parts.append("\(ownerCount) owner\(ownerCount == 1 ? "" : "s")")
+            } else {
+                parts.append("Personal account")
+            }
         }
         return parts.joined(separator: " · ")
     }

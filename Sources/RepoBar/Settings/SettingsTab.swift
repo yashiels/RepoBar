@@ -14,7 +14,7 @@ enum SettingsTab: Hashable {
 
     static let defaultWidth: CGFloat = 540
     static let repositoriesWidth: CGFloat = 980
-    static let windowHeight: CGFloat = 666
+    static let windowHeight: CGFloat = 733
 
     var title: String {
         switch self {

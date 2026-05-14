@@ -196,38 +196,6 @@ final class StatusBarMenuManager: NSObject, NSMenuDelegate {
         }
     }
 
-    @objc private func menuRepositoriesChanged() {
-        guard let menu = self.mainMenu else { return }
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-
-            self.applyStatusItemAppearance()
-            let plan = self.menuBuilder.mainMenuPlan()
-            guard self.lastMainMenuSignature != plan.signature else { return }
-
-            // Don't tear down and rebuild menu items while the menu is visible —
-            // replacing NSHostingViews under an open NSMenu can deadlock WindowServer.
-            if menu.items.compactMap(\.view).first?.window != nil {
-                self.lastMainMenuSignature = nil
-                return
-            }
-
-            self.recentListCoordinator.pruneMenus()
-            self.localGitMenuCoordinator.pruneMenus()
-            self.changelogMenuCoordinator.pruneMenus()
-            self.menuBuilder.populateMainMenu(menu, repos: plan.repos)
-            self.lastMainMenuSignature = plan.signature
-            self.lastMainMenuWidthSignature = nil
-            if let width = self.lastMainMenuWidth {
-                self.menuBuilder.refreshMenuViewHeights(in: menu, width: width)
-            } else {
-                self.menuBuilder.refreshMenuViewHeights(in: menu)
-            }
-            menu.update()
-        }
-    }
-
     @objc private func recentListFiltersChanged() {
         self.recentListCoordinator.handleFilterChanges()
     }
@@ -1014,5 +982,44 @@ private extension StatusBarMenuManager {
             return "\(label) \(remaining) left"
         }
         return "\(label) unknown"
+    }
+}
+
+extension StatusBarMenuManager {
+    @objc func menuRepositoriesChanged() {
+        guard let menu = self.mainMenu else { return }
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+
+            self.applyStatusItemAppearance()
+            let plan = self.menuBuilder.mainMenuPlan()
+            guard self.lastMainMenuSignature != plan.signature else { return }
+
+            if menu.hasVisibleHostedViews {
+                self.lastMainMenuSignature = nil
+                return
+            }
+
+            self.recentListCoordinator.pruneMenus()
+            self.localGitMenuCoordinator.pruneMenus()
+            self.changelogMenuCoordinator.pruneMenus()
+            self.menuBuilder.populateMainMenu(menu, repos: plan.repos)
+            self.lastMainMenuSignature = plan.signature
+            self.lastMainMenuWidthSignature = nil
+            if let width = self.lastMainMenuWidth {
+                self.menuBuilder.refreshMenuViewHeights(in: menu, width: width)
+            } else {
+                self.menuBuilder.refreshMenuViewHeights(in: menu)
+            }
+            menu.update()
+        }
+    }
+}
+
+@MainActor
+private extension NSMenu {
+    var hasVisibleHostedViews: Bool {
+        self.items.contains { $0.view?.window != nil }
     }
 }

@@ -25,17 +25,31 @@ public struct ActionsUsageInfo: Sendable, Equatable {
         let calendar = Calendar(identifier: .gregorian)
         let currentYear = calendar.component(.year, from: now)
         let currentMonth = calendar.component(.month, from: now)
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
         return self.items
             .filter { item in
                 guard item.unitType.lowercased() == "minutes" else { return false }
-                guard let date = formatter.date(from: item.date) else { return false }
+                guard let date = Self.date(fromUsageDate: item.date) else { return false }
+
                 let year = calendar.component(.year, from: date)
                 let month = calendar.component(.month, from: date)
                 return year == currentYear && month == currentMonth
             }
             .reduce(0) { $0 + $1.quantity }
+    }
+
+    static func date(fromUsageDate rawDate: String) -> Date? {
+        let internetFormatter = ISO8601DateFormatter()
+        internetFormatter.formatOptions = [.withInternetDateTime]
+        if let date = internetFormatter.date(from: rawDate) {
+            return date
+        }
+
+        let dateOnlyFormatter = DateFormatter()
+        dateOnlyFormatter.calendar = Calendar(identifier: .gregorian)
+        dateOnlyFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateOnlyFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        dateOnlyFormatter.dateFormat = "yyyy-MM-dd"
+        return dateOnlyFormatter.date(from: rawDate)
     }
 
     public var minutesByOS: [String: Double] {
@@ -117,7 +131,9 @@ public struct ActionsOrgSnapshot: Sendable, Equatable, Identifiable {
     public let cacheUsage: ActionsCacheUsage?
     public let artifactRetention: ArtifactRetentionPolicy?
 
-    public var id: String { self.org }
+    public var id: String {
+        self.org
+    }
 
     public init(
         org: String,
@@ -163,10 +179,21 @@ public struct ActionsRunnerInfo: Sendable, Equatable {
         self.fetchedAt = fetchedAt
     }
 
-    public var onlineCount: Int { self.runners.filter { $0.status == "online" }.count }
-    public var offlineCount: Int { self.runners.filter { $0.status == "offline" }.count }
-    public var busyCount: Int { self.runners.filter { $0.busy }.count }
-    public var idleCount: Int { self.runners.filter { $0.status == "online" && !$0.busy }.count }
+    public var onlineCount: Int {
+        self.runners.count(where: { $0.status == "online" })
+    }
+
+    public var offlineCount: Int {
+        self.runners.count(where: { $0.status == "offline" })
+    }
+
+    public var busyCount: Int {
+        self.runners.count(where: { $0.busy })
+    }
+
+    public var idleCount: Int {
+        self.runners.count(where: { $0.status == "online" && !$0.busy })
+    }
 }
 
 public struct RunnerSummary: Sendable, Equatable, Identifiable {
@@ -197,10 +224,10 @@ public enum GitHubPlanTier: String, CaseIterable, Equatable, Codable, Sendable {
 
     public var includedMinutesPerMonth: Int {
         switch self {
-        case .free: 2_000
-        case .pro: 3_000
-        case .team: 3_000
-        case .enterprise: 50_000
+        case .free: 2000
+        case .pro: 3000
+        case .team: 3000
+        case .enterprise: 50000
         }
     }
 
@@ -231,9 +258,17 @@ public enum GitHubPlanTier: String, CaseIterable, Equatable, Codable, Sendable {
         }
     }
 
-    public var maxJobExecutionHours: Int { 6 }
-    public var maxWorkflowRunHours: Int { 35 }
-    public var maxWorkflowRunDaysQueued: Int { 35 }
+    public var maxJobExecutionHours: Int {
+        6
+    }
+
+    public var maxWorkflowRunHours: Int {
+        35
+    }
+
+    public var maxWorkflowRunDaysQueued: Int {
+        35
+    }
 
     public var jobMatrixMax: Int {
         switch self {
@@ -242,7 +277,9 @@ public enum GitHubPlanTier: String, CaseIterable, Equatable, Codable, Sendable {
         }
     }
 
-    public var label: String { self.rawValue }
+    public var label: String {
+        self.rawValue
+    }
 }
 
 // MARK: - OS Minute Multipliers (GitHub bills macOS/Windows at higher rates)
@@ -254,9 +291,9 @@ public enum ActionsMinuteMultiplier {
 
     public static func multiplier(for os: String) -> Double {
         let lower = os.lowercased()
-        if lower.contains("macos") || lower.contains("mac") { return macOS }
-        if lower.contains("windows") || lower.contains("win") { return windows }
-        return linux
+        if lower.contains("macos") || lower.contains("mac") { return self.macOS }
+        if lower.contains("windows") || lower.contains("win") { return self.windows }
+        return self.linux
     }
 }
 
@@ -285,9 +322,17 @@ public struct ActiveWorkflowRun: Sendable, Equatable, Identifiable {
         self.startedAt = startedAt
     }
 
-    public var isQueued: Bool { self.status == "queued" || self.status == "waiting" || self.status == "pending" }
-    public var isRunning: Bool { self.status == "in_progress" }
-    public var repoName: String { self.repoFullName.components(separatedBy: "/").last ?? self.repoFullName }
+    public var isQueued: Bool {
+        self.status == "queued" || self.status == "waiting" || self.status == "pending"
+    }
+
+    public var isRunning: Bool {
+        self.status == "in_progress"
+    }
+
+    public var repoName: String {
+        self.repoFullName.components(separatedBy: "/").last ?? self.repoFullName
+    }
 }
 
 public struct ActionsQueueStatus: Sendable, Equatable {
@@ -303,7 +348,9 @@ public struct ActionsQueueStatus: Sendable, Equatable {
         self.fetchedAt = fetchedAt
     }
 
-    public var totalActiveCount: Int { self.inProgressCount + self.queuedCount }
+    public var totalActiveCount: Int {
+        self.inProgressCount + self.queuedCount
+    }
 }
 
 // MARK: - Actions Cache Usage
@@ -358,9 +405,13 @@ public struct HostedRunnerLimits: Sendable, Equatable {
             self.currentUsage = currentUsage
         }
 
-        public var remaining: Int { max(0, self.maximum - self.currentUsage) }
+        public var remaining: Int {
+            max(0, self.maximum - self.currentUsage)
+        }
+
         public var usagePercent: Double {
             guard self.maximum > 0 else { return 0 }
+
             return Double(self.currentUsage) / Double(self.maximum) * 100
         }
     }

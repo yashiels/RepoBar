@@ -90,7 +90,37 @@ struct SettingsStoreCoverageTests {
         let loaded = try JSONDecoder().decode(UserSettings.self, from: legacyData)
         #expect(loaded.repoList.displayLimit == 4)
         #expect(loaded.gitHubReferenceMonitor == GitHubReferenceMonitorSettings())
+        #expect(loaded.actions == ActionsSettings())
         #expect(loaded.githubArchives == GitHubArchiveSettings())
+    }
+
+    @Test
+    func `load older action settings defaults to hidden`() throws {
+        let data = try JSONEncoder().encode(UserSettings())
+        var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "actions")
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+        let loaded = try JSONDecoder().decode(UserSettings.self, from: legacyData)
+
+        #expect(loaded.actions.showActionsInMenu == false)
+    }
+
+    @Test
+    func `load legacy monitored action org as monitored owners`() throws {
+        let data = try JSONEncoder().encode(UserSettings())
+        var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object["actions"] = [
+            "showActionsInMenu": true,
+            "planTier": "Free",
+            "monitoredOrg": "OpenClaw"
+        ]
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+        let loaded = try JSONDecoder().decode(UserSettings.self, from: legacyData)
+
+        #expect(loaded.actions.showActionsInMenu)
+        #expect(loaded.monitoredOwners == ["openclaw"])
     }
 
     @Test

@@ -5,6 +5,7 @@ import SwiftUI
 struct GeneralSettingsView: View {
     @Bindable var session: Session
     let appState: AppState
+    @State private var monitoredOwnersDraft = ""
 
     private var normalizedCurrentUsername: String? {
         guard case let .loggedIn(user) = self.session.account else { return nil }
@@ -18,6 +19,18 @@ struct GeneralSettingsView: View {
         return OwnerFilter.normalize(self.session.settings.repoList.ownerFilter) == [username]
     }
 
+    private var visibleOwnerCandidates: [String] {
+        var owners = self.session.repositories.map(\.owner)
+        if case let .loggedIn(user) = self.session.account {
+            owners.append(user.username)
+        }
+        return OwnerFilter.normalize(owners)
+    }
+
+    private var selectedMonitoredOwners: [String] {
+        OwnerFilter.normalize(self.session.settings.monitoredOwners)
+    }
+
     private func toggleShowOnlyMyRepos(_ enabled: Bool) {
         guard let username = self.normalizedCurrentUsername else { return }
 
@@ -25,6 +38,47 @@ struct GeneralSettingsView: View {
 
         self.appState.persistSettings()
         self.appState.requestRefresh(cancelInFlight: true)
+    }
+
+    private func updateMonitoredOwners(from rawValue: String) {
+        let owners = Self.parseOwners(rawValue)
+        self.session.settings.monitoredOwners = owners
+        self.monitoredOwnersDraft = owners.joined(separator: ", ")
+        self.monitoredOwnersChanged()
+    }
+
+    private func useVisibleOwners() {
+        self.session.settings.monitoredOwners = self.visibleOwnerCandidates
+        self.monitoredOwnersDraft = self.visibleOwnerCandidates.joined(separator: ", ")
+        self.monitoredOwnersChanged()
+    }
+
+    private func clearMonitoredOwners() {
+        self.session.settings.monitoredOwners = []
+        self.monitoredOwnersDraft = ""
+        self.monitoredOwnersChanged()
+    }
+
+    private func removeMonitoredOwner(_ owner: String) {
+        let normalized = owner.lowercased()
+        self.session.settings.monitoredOwners = self.selectedMonitoredOwners.filter { $0 != normalized }
+        self.monitoredOwnersDraft = self.selectedMonitoredOwners.joined(separator: ", ")
+        self.monitoredOwnersChanged()
+    }
+
+    private func monitoredOwnersChanged() {
+        self.appState.persistSettings()
+        if !self.session.settings.menuCustomization.hiddenMainMenuItems.contains(.actionsLimits) {
+            self.session.actionsOrgSnapshots = []
+            NotificationCenter.default.post(name: .menuRepositoriesDidChange, object: nil)
+            self.appState.requestRefresh(cancelInFlight: true)
+        }
+    }
+
+    private static func parseOwners(_ rawValue: String) -> [String] {
+        OwnerFilter.normalize(rawValue.split { separator in
+            separator == "," || separator == " " || separator == "\n" || separator == "\t"
+        }.map(String.init))
     }
 
     var body: some View {
@@ -111,14 +165,45 @@ struct GeneralSettingsView: View {
                 }
 
                 Section {
-                    Toggle("Show Actions & Runners in menu", isOn: self.$session.settings.actions.showActionsInMenu)
-                        .onChange(of: self.session.settings.actions.showActionsInMenu) { _, _ in
-                            self.appState.persistSettings()
+                    LabeledContent("Owners") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 8) {
+                                TextField("Auto from visible repositories", text: self.$monitoredOwnersDraft)
+                                    .textFieldStyle(.roundedBorder)
+                                    .onSubmit { self.updateMonitoredOwners(from: self.monitoredOwnersDraft) }
+                                Button("Apply") { self.updateMonitoredOwners(from: self.monitoredOwnersDraft) }
+                                Button("Visible") { self.useVisibleOwners() }
+                                    .disabled(self.visibleOwnerCandidates.isEmpty)
+                                Button("Auto") { self.clearMonitoredOwners() }
+                                    .disabled(self.selectedMonitoredOwners.isEmpty)
+                            }
+
+                            if !self.selectedMonitoredOwners.isEmpty {
+                                LazyVGrid(
+                                    columns: [GridItem(.adaptive(minimum: 92), alignment: .leading)],
+                                    alignment: .leading,
+                                    spacing: 6
+                                ) {
+                                    ForEach(self.selectedMonitoredOwners, id: \.self) { owner in
+                                        Button {
+                                            self.removeMonitoredOwner(owner)
+                                        } label: {
+                                            Label(owner, systemImage: "xmark.circle")
+                                                .lineLimit(1)
+                                        }
+                                        .buttonStyle(.borderless)
+                                    }
+                                }
+                            }
                         }
+                    }
                 } header: {
-                    Text("Actions & Runners")
+                    Text("Monitored Owners")
                 } footer: {
-                    Text("Shows workflow runs, concurrent job usage, and self-hosted runners per organization. Plans are auto-detected with a classic PAT.")
+                    Text(
+                        "Empty owners means personal account plus owners in the visible repository list. "
+                            + "Use comma-separated owner names to pin RepoBar to specific owners."
+                    )
                 }
             }
             .formStyle(.grouped)
@@ -132,5 +217,8 @@ struct GeneralSettingsView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
+        .onAppear {
+            self.monitoredOwnersDraft = self.selectedMonitoredOwners.joined(separator: ", ")
+        }
     }
 }

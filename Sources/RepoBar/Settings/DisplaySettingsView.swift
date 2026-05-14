@@ -7,14 +7,6 @@ struct DisplaySettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Toggle("Show GitHub rate-limit meter in menu bar", isOn: self.$session.settings.appearance.showRateLimitMeterInMenuBar)
-                .onChange(of: self.session.settings.appearance.showRateLimitMeterInMenuBar) { _, _ in
-                    self.appState.persistSettings()
-                    NotificationCenter.default.post(name: .menuDiagnosticsDidChange, object: nil)
-                }
-
-            Divider()
-
             HStack {
                 Text("Customize the menu layout and repo submenu items.")
                     .font(.callout)
@@ -25,6 +17,8 @@ struct DisplaySettingsView: View {
                 }
                 .buttonStyle(.bordered)
             }
+
+            self.menuBarList()
 
             HStack(alignment: .top, spacing: 16) {
                 self.mainMenuList()
@@ -42,6 +36,22 @@ struct DisplaySettingsView: View {
 
     private var repoSubmenuItems: [RepoSubmenuItemID] {
         self.session.settings.menuCustomization.repoSubmenuOrder
+    }
+
+    private func menuBarList() -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Menu Bar")
+                .font(.headline)
+            List {
+                self.menuRow(
+                    title: "GitHub rate-limit meter",
+                    subtitle: "Show quota status beside the RepoBar menu bar icon",
+                    isRequired: false,
+                    isVisible: self.rateLimitMeterVisibility
+                )
+            }
+            .frame(maxWidth: .infinity, minHeight: 58, maxHeight: 58)
+        }
     }
 
     private func mainMenuList() -> some View {
@@ -163,8 +173,26 @@ struct DisplaySettingsView: View {
         )
     }
 
+    private var rateLimitMeterVisibility: Binding<Bool> {
+        Binding(
+            get: {
+                self.session.settings.appearance.showRateLimitMeterInMenuBar
+            },
+            set: { isVisible in
+                self.session.settings.appearance.showRateLimitMeterInMenuBar = isVisible
+                self.appState.persistSettings()
+                NotificationCenter.default.post(name: .menuDiagnosticsDidChange, object: nil)
+            }
+        )
+    }
+
     private func updateCustomization(_ customization: MenuCustomization) {
         self.session.settings.menuCustomization = customization
+        self.session.settings.actions.showActionsInMenu = !customization.hiddenMainMenuItems.contains(.actionsLimits)
+        if customization.hiddenMainMenuItems.contains(.actionsLimits) {
+            self.session.actionsOrgSnapshots = []
+            NotificationCenter.default.post(name: .menuRepositoriesDidChange, object: nil)
+        }
         self.appState.persistSettings()
         self.appState.requestRefresh()
     }

@@ -4,36 +4,21 @@ import RepoBarCore
 extension AppState {
     func refreshActionsLimitsState() async {
         let settings = self.session.settings.actions
-        guard settings.showActionsInMenu else { return }
+        let menuCustomization = self.session.settings.menuCustomization.normalized()
+        guard !menuCustomization.hiddenMainMenuItems.contains(.actionsLimits) else { return }
         guard case let .loggedIn(user) = self.session.account else { return }
 
         let github = self.github
         let repos = self.session.repositories
-        let authMethod = self.session.settings.authMethod
 
         let userTier = user.detectedPlanTier ?? settings.planTier
         await MainActor.run { self.session.actionsPlanTier = userTier }
 
-        let apiOrgs = (authMethod == .pat) ? ((try? await github.userOrganizations()) ?? []) : []
-
-        var owners: [(name: String, isOrg: Bool)] = [(name: user.username, isOrg: false)]
-        var seen = Set<String>([user.username.lowercased()])
-
-        if !apiOrgs.isEmpty {
-            for org in apiOrgs {
-                if seen.insert(org.lowercased()).inserted {
-                    owners.append((name: org, isOrg: true))
-                }
-            }
-        } else {
-            let repoOwners = Self.repoOwners(from: repos, excludingUsername: user.username)
-            for repoOwner in repoOwners {
-                guard seen.insert(repoOwner.lowercased()).inserted else { continue }
-                if (try? await github.organizationPlan(org: repoOwner)) != nil {
-                    owners.append((name: repoOwner, isOrg: true))
-                }
-            }
-        }
+        let owners = Self.actionsOwners(
+            username: user.username,
+            repositories: repos,
+            monitoredOwners: self.session.settings.monitoredOwners
+        )
 
         var snapshots: [ActionsOrgSnapshot] = []
         for owner in owners {
@@ -42,18 +27,15 @@ extension AppState {
             let queue = await Self.fetchQueueStatus(github: github, repos: ownerRepos)
 
             var ownerTier = userTier
-            if owner.isOrg {
-                if let orgPlanName = try? await github.organizationPlan(org: owner.name),
-                   let detected = UserIdentity.planTier(from: orgPlanName) {
-                    ownerTier = detected
-                }
+            if let detected = await Self.detectedPlanTier(for: owner, github: github) {
+                ownerTier = detected
             }
 
             let billingUsage = try? await github.actionsBillingUsage(owner: owner.name, isOrg: owner.isOrg)
             let minutesUsed = billingUsage.map { Int($0.minutesUsedInCurrentMonth().rounded()) }
             let minutesIncluded = ownerTier.includedMinutesPerMonth
-            let cacheUsage = owner.isOrg ? (try? await github.actionsCacheUsage(org: owner.name)) : nil
-            let artifactRetention = owner.isOrg ? (try? await github.artifactRetentionPolicy(org: owner.name)) : nil
+            let cacheUsage = await owner.isOrg ? (try? github.actionsCacheUsage(org: owner.name)) : nil
+            let artifactRetention = await owner.isOrg ? (try? github.artifactRetentionPolicy(org: owner.name)) : nil
 
             snapshots.append(ActionsOrgSnapshot(
                 org: owner.name,
@@ -70,16 +52,44 @@ extension AppState {
 
         await MainActor.run {
             self.session.actionsOrgSnapshots = snapshots
+            NotificationCenter.default.post(name: .menuRepositoriesDidChange, object: nil)
         }
+    }
+
+    private static func detectedPlanTier(
+        for owner: (name: String, isOrg: Bool),
+        github: GitHubClient
+    ) async -> GitHubPlanTier? {
+        guard owner.isOrg,
+              let orgPlanName = try? await github.organizationPlan(org: owner.name)
+        else { return nil }
+
+        return UserIdentity.planTier(from: orgPlanName)
+    }
+
+    static func actionsOwners(
+        username: String,
+        repositories repos: [Repository],
+        monitoredOwners: [String]
+    ) -> [(name: String, isOrg: Bool)] {
+        let usernameKey = username.lowercased()
+        let filteredOwners = OwnerFilter.normalize(monitoredOwners)
+        if !filteredOwners.isEmpty {
+            return filteredOwners.map { owner in
+                (name: owner, isOrg: owner.lowercased() != usernameKey)
+            }
+        }
+
+        var owners: [(name: String, isOrg: Bool)] = [(name: username, isOrg: false)]
+        owners.append(contentsOf: Self.repoOwners(from: repos, excludingUsername: username).map { (name: $0, isOrg: true) })
+        return owners
     }
 
     private static func repoOwners(from repos: [Repository], excludingUsername username: String) -> [String] {
         var seen = Set<String>([username.lowercased()])
         var result: [String] = []
-        for repo in repos {
-            if seen.insert(repo.owner.lowercased()).inserted {
-                result.append(repo.owner)
-            }
+        for repo in repos where seen.insert(repo.owner.lowercased()).inserted {
+            result.append(repo.owner)
         }
         return result
     }
@@ -93,6 +103,7 @@ extension AppState {
             return orgRunners
         }
         guard let first = repos.first else { return nil }
+
         return try? await github.selfHostedRunners(owner: first.owner, repo: first.name)
     }
 
@@ -101,6 +112,7 @@ extension AppState {
         repos: [Repository]
     ) async -> ActionsQueueStatus? {
         guard !repos.isEmpty else { return nil }
+
         var totalInProgress = 0
         var totalQueued = 0
         var allRuns: [ActiveWorkflowRun] = []
@@ -111,12 +123,14 @@ extension AppState {
             guard let status = try? await github.actionsQueueStatus(owner: repo.owner, name: repo.name) else {
                 continue
             }
+
             totalInProgress += status.inProgressCount
             totalQueued += status.queuedCount
             allRuns.append(contentsOf: status.runs)
         }
 
         guard totalInProgress > 0 || totalQueued > 0 else { return nil }
+
         return ActionsQueueStatus(
             inProgressCount: totalInProgress,
             queuedCount: totalQueued,
