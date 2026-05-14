@@ -26,6 +26,18 @@ struct GitHubRestAPITests {
     }
 
     @Test
+    func `self hosted runner urls request full pages`() throws {
+        let baseURL = try #require(URL(string: "https://api.github.com"))
+        let orgURL = GitHubRestAPI.selfHostedRunnersURL(baseURL: baseURL, owner: "acme", repo: nil, page: 2)
+        let repoURL = GitHubRestAPI.selfHostedRunnersURL(baseURL: baseURL, owner: "acme", repo: "widget", page: 1)
+
+        #expect(orgURL.path == "/orgs/acme/actions/runners")
+        #expect(orgURL.query == "per_page=100&page=2")
+        #expect(repoURL.path == "/repos/acme/widget/actions/runners")
+        #expect(repoURL.query == "per_page=100&page=1")
+    }
+
+    @Test
     func `recent issue page keeps raw count while filtering pull requests`() throws {
         let data = Data("""
         [

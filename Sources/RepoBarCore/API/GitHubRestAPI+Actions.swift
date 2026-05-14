@@ -5,28 +5,41 @@ extension GitHubRestAPI {
         let token = try await tokenProvider()
         let baseURL = await apiHost()
         let now = Date()
-        let path = if let repo {
-            "/repos/\(owner)/\(repo)/actions/runners"
-        } else {
-            "/orgs/\(owner)/actions/runners"
-        }
-        let (data, _) = try await authorizedGet(
-            url: baseURL.appending(path: path),
-            token: token,
-            allowedStatuses: [200, 304, 404]
-        )
-        let decoded = try GitHubDecoding.decode(RunnersResponse.self, from: data)
-        let runners = decoded.runners.map { runner in
-            RunnerSummary(
-                id: runner.id,
-                name: runner.name,
-                os: runner.os,
-                status: runner.status,
-                busy: runner.busy,
-                labels: runner.labels.map(\.name)
+        let pageSize = 100
+        var page = 1
+        var collected: [RunnerResponse] = []
+        var totalCount = 0
+
+        while true {
+            let url = Self.selfHostedRunnersURL(
+                baseURL: baseURL,
+                owner: owner,
+                repo: repo,
+                page: page,
+                perPage: pageSize
             )
+            let (data, _) = try await authorizedGet(
+                url: url,
+                token: token,
+                allowedStatuses: [200, 304, 404]
+            )
+            let decoded = try GitHubDecoding.decode(RunnersResponse.self, from: data)
+            if page == 1 {
+                totalCount = decoded.totalCount
+            }
+            collected.append(contentsOf: decoded.runners)
+
+            if collected.count >= totalCount || decoded.runners.count < pageSize {
+                break
+            }
+            page += 1
         }
-        return ActionsRunnerInfo(totalCount: decoded.totalCount, runners: runners, fetchedAt: now)
+
+        return ActionsRunnerInfo(
+            totalCount: totalCount,
+            runners: collected.map(Self.runnerSummary(from:)),
+            fetchedAt: now
+        )
     }
 
     func actionsQueueStatus(owner: String, name: String) async throws -> ActionsQueueStatus {
@@ -133,6 +146,31 @@ extension GitHubRestAPI {
             URLQueryItem(name: "per_page", value: "10")
         ]
         return components.url!
+    }
+
+    static func selfHostedRunnersURL(baseURL: URL, owner: String, repo: String?, page: Int, perPage: Int = 100) -> URL {
+        let path = if let repo {
+            "/repos/\(owner)/\(repo)/actions/runners"
+        } else {
+            "/orgs/\(owner)/actions/runners"
+        }
+        var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "per_page", value: "\(perPage)"),
+            URLQueryItem(name: "page", value: "\(page)")
+        ]
+        return components.url!
+    }
+
+    private static func runnerSummary(from runner: RunnerResponse) -> RunnerSummary {
+        RunnerSummary(
+            id: runner.id,
+            name: runner.name,
+            os: runner.os,
+            status: runner.status,
+            busy: runner.busy,
+            labels: runner.labels.map(\.name)
+        )
     }
 
     private static func activeWorkflowRun(from run: ActionsRunsResponse.WorkflowRun, fallbackRepoFullName: String) -> ActiveWorkflowRun? {
