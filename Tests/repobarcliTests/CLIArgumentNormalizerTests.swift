@@ -137,4 +137,19 @@ struct CLIArgumentNormalizerTests {
         let terminalArgs = CLIArgumentNormalizer.normalize(["repobar", "open", "terminal", "~/Projects"])
         #expect(terminalArgs[1] == "open-terminal")
     }
+
+    @Test
+    func `help targets resolve nested command paths`() {
+        #expect(HelpTarget.from(argv: ["repobar", "help", "archives", "add"]) == .archivesAdd)
+        #expect(HelpTarget.from(argv: ["repobar", "help", "cache", "status"]) == .cacheStatus)
+        #expect(HelpTarget.from(argv: ["repobar", "help", "settings", "set"]) == .settingsSet)
+        #expect(HelpTarget.from(argv: ["repobar", "help", "local", "worktrees"]) == .worktrees)
+    }
+
+    @Test
+    func `help targets resolve command aliases`() {
+        #expect(HelpTarget.from(argv: ["repobar", "help", "pr"]) == .pulls)
+        #expect(HelpTarget.from(argv: ["repobar", "help", "runs"]) == .ci)
+        #expect(HelpTarget.from(argv: ["repobar", "help", "rate-limit"]) == .rateLimits)
+    }
 }

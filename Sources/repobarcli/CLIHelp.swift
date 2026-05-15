@@ -54,13 +54,18 @@ enum HelpTarget: String {
         guard !argv.isEmpty else { return .root }
 
         if argv.count > 1, argv[1] == "help" {
-            let target = argv.dropFirst(2).first
-            return HelpTarget.from(token: target)
+            return HelpTarget.from(tokens: Array(argv.dropFirst(2)))
         }
 
         guard argv.contains("--help") || argv.contains("-h") else { return nil }
 
-        let target = argv.dropFirst().first(where: { !$0.hasPrefix("-") })
+        let tokens = argv.dropFirst().filter { !$0.hasPrefix("-") }
+        return HelpTarget.from(tokens: tokens)
+    }
+
+    private static func from(tokens: [String]) -> HelpTarget {
+        let normalized = CLIArgumentNormalizer.normalize([RepoBarRoot.commandName] + tokens)
+        let target = normalized.dropFirst().first
         return HelpTarget.from(token: target)
     }
 

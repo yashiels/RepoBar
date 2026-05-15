@@ -96,12 +96,11 @@ struct RepoCommand: CommanderRunnableCommand {
     }
 
     mutating func run() async throws {
-        let repoName = try requireRepoName(self.repoName)
-        let (owner, name) = try parseRepoName(repoName)
+        let repoID = try requireRepoIdentifier(self.repoName)
 
         let context = try await makeAuthenticatedClient()
         let client = context.client
-        let repo = try await client.fullRepository(owner: owner, name: name)
+        let repo = try await client.fullRepository(owner: repoID.owner, name: repoID.name)
 
         if self.output.jsonOutput {
             let output = RepoDetailOutput(
@@ -196,23 +195,16 @@ struct IssuesCommand: CommanderRunnableCommand {
         if self.limit <= 0 {
             throw ValidationError("--limit must be greater than 0")
         }
-        guard let repoName, !repoName.isEmpty else {
-            throw ValidationError("Missing repository name (owner/name)")
-        }
-
-        let parts = repoName.split(separator: "/", maxSplits: 1).map(String.init)
-        guard parts.count == 2 else {
-            throw ValidationError("Repository must be in owner/name format")
-        }
+        let repoID = try requireRepoIdentifier(self.repoName)
 
         let context = try await makeAuthenticatedClient()
         let client = context.client
         let settings = context.settings
-        let issues = try await client.recentIssues(owner: parts[0], name: parts[1], limit: self.limit)
+        let issues = try await client.recentIssues(owner: repoID.owner, name: repoID.name, limit: self.limit)
 
         if self.output.jsonOutput {
             try printJSON(RepoIssuesOutput(
-                repo: makeRepoURL(baseHost: settings.enterpriseHost ?? settings.githubHost, owner: parts[0], name: parts[1]),
+                repo: repoID.webURL(baseHost: settings.enterpriseHost ?? settings.githubHost),
                 count: issues.count,
                 issues: issues.map {
                     IssueOutput(
@@ -228,7 +220,7 @@ struct IssuesCommand: CommanderRunnableCommand {
         }
 
         if self.output.plain == false, self.output.useColor {
-            print("Issues: \(repoName)")
+            print("Issues: \(repoID.fullName)")
         }
         let lines = issuesTableLines(
             issues,
@@ -275,23 +267,16 @@ struct PullsCommand: CommanderRunnableCommand {
         if self.limit <= 0 {
             throw ValidationError("--limit must be greater than 0")
         }
-        guard let repoName, !repoName.isEmpty else {
-            throw ValidationError("Missing repository name (owner/name)")
-        }
-
-        let parts = repoName.split(separator: "/", maxSplits: 1).map(String.init)
-        guard parts.count == 2 else {
-            throw ValidationError("Repository must be in owner/name format")
-        }
+        let repoID = try requireRepoIdentifier(self.repoName)
 
         let context = try await makeAuthenticatedClient()
         let client = context.client
         let settings = context.settings
-        let pulls = try await client.recentPullRequests(owner: parts[0], name: parts[1], limit: self.limit)
+        let pulls = try await client.recentPullRequests(owner: repoID.owner, name: repoID.name, limit: self.limit)
 
         if self.output.jsonOutput {
             try printJSON(RepoPullsOutput(
-                repo: makeRepoURL(baseHost: settings.enterpriseHost ?? settings.githubHost, owner: parts[0], name: parts[1]),
+                repo: repoID.webURL(baseHost: settings.enterpriseHost ?? settings.githubHost),
                 count: pulls.count,
                 pulls: pulls.map {
                     PullRequestOutput(
@@ -308,7 +293,7 @@ struct PullsCommand: CommanderRunnableCommand {
         }
 
         if self.output.plain == false, self.output.useColor {
-            print("Pull Requests: \(repoName)")
+            print("Pull Requests: \(repoID.fullName)")
         }
         let lines = pullsTableLines(
             pulls,
@@ -375,13 +360,15 @@ private func refreshPinned(_ pinned: [String], client: GitHubClient) async throw
     try await withThrowingTaskGroup(of: RefreshRepositoryOutput.self) { group in
         for name in pinned {
             group.addTask {
-                let parts = name.split(separator: "/", maxSplits: 1).map(String.init)
-                guard parts.count == 2 else {
+                let parsed: RepoIdentifier
+                do {
+                    parsed = try parseRepoName(name)
+                } catch {
                     return RefreshRepositoryOutput(fullName: name, error: "Invalid repository name", rateLimitedUntil: nil)
                 }
 
                 do {
-                    let repo = try await client.fullRepository(owner: parts[0], name: parts[1])
+                    let repo = try await client.fullRepository(owner: parsed.owner, name: parsed.name)
                     return RefreshRepositoryOutput(
                         fullName: repo.fullName,
                         error: repo.error,

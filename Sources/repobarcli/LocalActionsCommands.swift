@@ -329,8 +329,7 @@ struct CheckoutCommand: CommanderRunnableCommand {
     }
 
     mutating func run() async throws {
-        let repoName = try requireRepoName(self.repoName)
-        let (owner, name) = try parseRepoName(repoName)
+        let repo = try requireRepoIdentifier(self.repoName)
         let settingsStore = SettingsStore()
         var settings = settingsStore.load()
         let host = settings.enterpriseHost ?? settings.githubHost
@@ -346,19 +345,19 @@ struct CheckoutCommand: CommanderRunnableCommand {
         } else {
             let expandedRoot = PathFormatter.expandTilde(rootPath ?? "")
             let rootURL = URL(fileURLWithPath: expandedRoot, isDirectory: true)
-            destinationURL = rootURL.appendingPathComponent(name, isDirectory: true)
+            destinationURL = rootURL.appendingPathComponent(repo.name, isDirectory: true)
         }
 
         if FileManager.default.fileExists(atPath: destinationURL.path) {
             throw ValidationError("Destination already exists: \(PathFormatter.displayString(destinationURL.path))")
         }
 
-        var remoteURL = host.appendingPathComponent("\(owner)/\(name)")
+        var remoteURL = host.appendingPathComponent(repo.fullName)
         remoteURL.appendPathExtension("git")
 
         try LocalGitService().cloneRepo(remoteURL: remoteURL, to: destinationURL)
 
-        settings.localProjects.preferredLocalPathsByFullName[repoName] = destinationURL.path
+        settings.localProjects.preferredLocalPathsByFullName[repo.fullName] = destinationURL.path
         settingsStore.save(settings)
 
         if self.openAfter {
@@ -367,7 +366,7 @@ struct CheckoutCommand: CommanderRunnableCommand {
 
         if self.output.jsonOutput {
             let output = CheckoutOutput(
-                repo: repoName,
+                repo: repo.fullName,
                 destination: destinationURL.path,
                 opened: self.openAfter
             )
@@ -375,6 +374,6 @@ struct CheckoutCommand: CommanderRunnableCommand {
             return
         }
 
-        print("Checked out \(repoName) → \(PathFormatter.displayString(destinationURL.path))")
+        print("Checked out \(repo.fullName) → \(PathFormatter.displayString(destinationURL.path))")
     }
 }

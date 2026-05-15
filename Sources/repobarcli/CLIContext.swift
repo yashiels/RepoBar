@@ -8,6 +8,19 @@ struct AuthContext {
     let host: URL
 }
 
+struct RepoIdentifier: Equatable {
+    let owner: String
+    let name: String
+
+    var fullName: String {
+        "\(self.owner)/\(self.name)"
+    }
+
+    func webURL(baseHost: URL) -> URL {
+        baseHost.appending(path: "/\(self.owner)/\(self.name)")
+    }
+}
+
 func makeAuthenticatedClient() async throws -> AuthContext {
     guard (try? TokenStore.shared.load()) != nil else {
         throw CLIError.notAuthenticated
@@ -30,22 +43,74 @@ func makeAuthenticatedClient() async throws -> AuthContext {
 }
 
 func makeRepoURL(baseHost: URL, owner: String, name: String) -> URL {
-    baseHost.appending(path: "/\(owner)/\(name)")
+    RepoIdentifier(owner: owner, name: name).webURL(baseHost: baseHost)
 }
 
 func requireRepoName(_ name: String?) throws -> String {
-    guard let name, name.isEmpty == false else {
+    guard let name = name?.trimmingCharacters(in: .whitespacesAndNewlines), name.isEmpty == false else {
         throw ValidationError("Missing repository name (owner/name)")
     }
 
     return name
 }
 
-func parseRepoName(_ value: String) throws -> (owner: String, name: String) {
-    let parts = value.split(separator: "/", maxSplits: 1).map(String.init)
-    guard parts.count == 2, parts[0].isEmpty == false, parts[1].isEmpty == false else {
+func requireRepoIdentifier(_ name: String?) throws -> RepoIdentifier {
+    try parseRepoName(requireRepoName(name))
+}
+
+func parseRepoName(_ value: String) throws -> RepoIdentifier {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed.isEmpty == false else {
         throw ValidationError("Repository must be in owner/name format")
     }
 
-    return (parts[0], parts[1])
+    if let remoteParts = repoPartsFromRemote(trimmed) {
+        return try RepoIdentifier(validatingOwner: remoteParts.owner, name: remoteParts.name)
+    }
+
+    let parts = trimmed.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+    guard parts.count == 2 else {
+        throw ValidationError("Repository must be in owner/name format")
+    }
+
+    return try RepoIdentifier(validatingOwner: parts[0], name: parts[1])
+}
+
+private func repoPartsFromRemote(_ value: String) -> (owner: String, name: String)? {
+    if let url = URL(string: value), let host = url.host, host.isEmpty == false {
+        let parts = url.path.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+        guard parts.count >= 2 else { return nil }
+
+        return (parts[0], parts[1])
+    }
+
+    guard let separator = value.firstIndex(of: ":") else { return nil }
+
+    let prefix = value[..<separator]
+    guard prefix.contains("@") else { return nil }
+
+    let path = String(value[value.index(after: separator)...])
+    let parts = path.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+    guard parts.count >= 2 else { return nil }
+
+    return (parts[parts.count - 2], parts[parts.count - 1])
+}
+
+private extension RepoIdentifier {
+    init(validatingOwner rawOwner: String, name rawName: String) throws {
+        let owner = rawOwner.trimmingCharacters(in: .whitespacesAndNewlines)
+        var name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if name.hasSuffix(".git") {
+            name.removeLast(4)
+        }
+
+        guard owner.isEmpty == false, name.isEmpty == false else {
+            throw ValidationError("Repository must be in owner/name format")
+        }
+        guard owner.contains("/") == false, name.contains("/") == false else {
+            throw ValidationError("Repository must be in owner/name format")
+        }
+
+        self.init(owner: owner, name: name)
+    }
 }

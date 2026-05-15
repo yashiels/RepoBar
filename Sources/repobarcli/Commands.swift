@@ -321,21 +321,19 @@ struct ReposCommand: CommanderRunnableCommand {
 
     private struct RepoLookup {
         let index: Int
-        let owner: String
-        let name: String
+        let repo: RepoIdentifier
     }
 
     private func fetchNamedRepositories(_ names: [String], client: GitHubClient) async throws -> [Repository] {
         let targets: [RepoLookup] = names.enumerated().compactMap { index, name in
-            let parts = name.split(separator: "/", maxSplits: 1).map(String.init)
-            guard parts.count == 2 else { return nil }
+            guard let repo = try? parseRepoName(name) else { return nil }
 
-            return RepoLookup(index: index, owner: parts[0], name: parts[1])
+            return RepoLookup(index: index, repo: repo)
         }
         return try await withThrowingTaskGroup(of: (Int, Repository).self) { group in
             for target in targets {
                 group.addTask {
-                    let repo = try await client.fullRepository(owner: target.owner, name: target.name)
+                    let repo = try await client.fullRepository(owner: target.repo.owner, name: target.repo.name)
                     return (target.index, repo.withOrder(target.index))
                 }
             }

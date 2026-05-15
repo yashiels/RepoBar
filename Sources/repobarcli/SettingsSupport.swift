@@ -426,8 +426,7 @@ func intervalLabel(_ interval: RefreshInterval) -> String {
 }
 
 func normalizeRepoFullName(_ raw: String) throws -> String {
-    let (owner, name) = try parseRepoName(raw)
-    return "\(owner)/\(name)"
+    try parseRepoName(raw).fullName
 }
 
 func renderRepoListUpdate(action: String, repoName: String, settings: UserSettings, output: OutputOptions) throws {
