@@ -2,6 +2,7 @@
 
 ## 0.6.1 - Unreleased
 
+- Stop showing a repository warning when GitHub's pull request REST endpoint returns 404 for an otherwise visible repository.
 - Fix RepoBar CLI help and repository parsing so nested `help` paths, aliases, pasted GitHub URLs, SSH remotes, whitespace, and `.git` suffixes resolve consistently.
 
 ## 0.6.0 - 2026-05-14

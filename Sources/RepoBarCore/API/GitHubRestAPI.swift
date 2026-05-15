@@ -451,7 +451,7 @@ struct GitHubRestAPI {
         return data
     }
 
-    func openPullRequestCount(owner: String, name: String) async throws -> Int {
+    func openPullRequestCount(owner: String, name: String) async throws -> Int? {
         let token = try await tokenProvider()
         let baseURL = await apiHost()
         var components = URLComponents(
@@ -463,7 +463,20 @@ struct GitHubRestAPI {
             URLQueryItem(name: "per_page", value: "1"),
             URLQueryItem(name: "page", value: "1")
         ]
-        let (data, response) = try await authorizedGet(url: components.url!, token: token, useETag: false)
+        let (data, response) = try await authorizedGet(
+            url: components.url!,
+            token: token,
+            allowedStatuses: [200, 304, 404],
+            useETag: false
+        )
+        return try Self.openPullRequestCount(from: data, response: response)
+    }
+
+    static func openPullRequestCount(from data: Data, response: HTTPURLResponse) throws -> Int? {
+        if response.statusCode == 404 {
+            return nil
+        }
+
         let pulls = try GitHubDecoding.decode([PullRequestListItem].self, from: data)
 
         if let link = response.value(forHTTPHeaderField: "Link"), let last = GitHubPagination.lastPage(from: link) {

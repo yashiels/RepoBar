@@ -212,7 +212,7 @@ public actor GitHubClient {
     }
 
     private struct ActivityFetchResult {
-        let pulls: Result<Int, Error>
+        let pulls: Result<Int?, Error>
         let activity: Result<ActivitySnapshot, Error>
     }
 
@@ -223,7 +223,7 @@ public actor GitHubClient {
                     let owner = item.owner.login
                     let name = item.name
                     let fullName = "\(owner)/\(name)"
-                    async let openPullsResult: Result<Int, Error> = self.capture {
+                    async let openPullsResult: Result<Int?, Error> = self.capture {
                         try await self.restAPI.openPullRequestCount(owner: owner, name: name)
                     }
                     async let activityResult: Result<ActivitySnapshot, Error> = self.capture {
@@ -265,11 +265,18 @@ public actor GitHubClient {
 
     private func activityRepository(
         from item: RepoItem,
-        openPullsResult: Result<Int, Error>,
+        openPullsResult: Result<Int?, Error>,
         activityResult: Result<ActivitySnapshot, Error>
     ) -> Repository {
         var accumulator = RepoErrorAccumulator()
-        let openPulls = self.value(from: openPullsResult, into: &accumulator) ?? 0
+        let openPulls: Int
+        switch openPullsResult {
+        case let .success(value):
+            openPulls = value ?? 0
+        case let .failure(error):
+            accumulator.absorb(error)
+            openPulls = 0
+        }
         let issues = max(item.openIssuesCount - openPulls, 0)
         let snapshot = self.value(from: activityResult, into: &accumulator)
         let activity: ActivityEvent? = snapshot?.latest ?? snapshot?.events.first

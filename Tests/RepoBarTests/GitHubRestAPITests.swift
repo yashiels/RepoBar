@@ -26,6 +26,21 @@ struct GitHubRestAPITests {
     }
 
     @Test
+    func `open pull request count treats missing pulls endpoint as unknown`() throws {
+        let url = try #require(URL(string: "https://api.github.com/repos/acme/docs/pulls"))
+        let response = try #require(HTTPURLResponse(
+            url: url,
+            statusCode: 404,
+            httpVersion: nil,
+            headerFields: nil
+        ))
+
+        let count = try GitHubRestAPI.openPullRequestCount(from: Data("{}".utf8), response: response)
+
+        #expect(count == nil)
+    }
+
+    @Test
     func `self hosted runner urls request full pages`() throws {
         let baseURL = try #require(URL(string: "https://api.github.com"))
         let orgURL = GitHubRestAPI.selfHostedRunnersURL(baseURL: baseURL, owner: "acme", repo: nil, page: 2)

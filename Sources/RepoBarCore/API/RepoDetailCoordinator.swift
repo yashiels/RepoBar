@@ -49,7 +49,7 @@ actor RepoDetailCoordinator {
             didUpdateCache = true
         }
         let cacheState = self.policy.state(for: cache, now: now)
-        let cachedOpenPulls = cache.openPulls ?? 0
+        let cachedOpenPulls = cache.openPulls
         let cachedCiDetails = cache.ciDetails ?? CIStatusDetails(status: .unknown, runCount: nil)
         let cachedActivitySnapshot = Self.cachedActivitySnapshot(
             latest: cache.latestActivity,
@@ -70,7 +70,7 @@ actor RepoDetailCoordinator {
 
         // Run all expensive lookups in parallel; individual failures are folded into the accumulator.
         let restAPI = self.restAPI
-        async let openPullsResult: Result<Int, Error> = shouldFetchPulls
+        async let openPullsResult: Result<Int?, Error> = shouldFetchPulls
             ? Self.capture { try await restAPI.openPullRequestCount(owner: resolvedOwner, name: resolvedName) }
             : .success(cachedOpenPulls)
         async let ciResult: Result<CIStatusDetails, Error> = shouldFetchCI
@@ -92,7 +92,7 @@ actor RepoDetailCoordinator {
         let openPulls: Int
         switch await openPullsResult {
         case let .success(value):
-            openPulls = value
+            openPulls = value ?? 0
             if shouldFetchPulls {
                 cache.openPulls = value
                 cache.openPullsFetchedAt = now
