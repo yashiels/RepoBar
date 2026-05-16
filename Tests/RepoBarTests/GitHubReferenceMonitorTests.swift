@@ -304,6 +304,53 @@ struct GitHubReferenceMonitorTests {
     }
 
     @Test
+    func `bare numbers in pr and issue prose become multiple references`() {
+        let text = """
+        any chance you can review PR 75133, 78985 and 82724 for inclusion? They are all related to bugs/issues with subagents, delegated tasks to harnesses like codex and claude.
+
+        I also have a security fix/enhancement I have proposed that has been out there for a while. That is 76949.
+        """
+        #expect(GitHubReferenceTranslator.queries(from: text) == [
+            .issueNumber(75133),
+            .issueNumber(78985),
+            .issueNumber(82724),
+            .issueNumber(76949)
+        ])
+
+        #expect(GitHubReferenceTranslator.queries(from: "PR #123, 456 and 789") == [
+            .issueNumber(123),
+            .issueNumber(456),
+            .issueNumber(789)
+        ])
+
+        #expect(GitHubReferenceTranslator.queries(from: "please review pull requests 123 and 456") == [
+            .issueNumber(123),
+            .issueNumber(456)
+        ])
+
+        #expect(GitHubReferenceTranslator.queries(from: """
+        I also have a security fix/enhancement I have proposed that has been out there for a while.
+        That is 76949.
+        """) == [.issueNumber(76949)])
+    }
+
+    @Test
+    func `contextual bare issue parser ignores years`() {
+        let text = "please review PR 68 from 2026"
+        #expect(GitHubReferenceTranslator.queries(from: text) == [.issueNumber(68)])
+        #expect(GitHubReferenceTranslator.queries(from: "please review PR 2026") == [.issueNumber(2026)])
+        #expect(GitHubReferenceTranslator.queries(from: "please review issue 1999") == [.issueNumber(1999)])
+    }
+
+    @Test
+    func `contextual bare issue parser ignores incidental sentence numbers`() {
+        #expect(GitHubReferenceTranslator.queries(from: "please review PR 68 with 2 commits") == [.issueNumber(68)])
+        #expect(GitHubReferenceTranslator.queries(from: "please review PR 123 on iOS 26") == [.issueNumber(123)])
+        #expect(GitHubReferenceTranslator.queries(from: "this PR has 2 commits").isEmpty)
+        #expect(GitHubReferenceTranslator.queries(from: "I have issues with 2 things").isEmpty)
+    }
+
+    @Test
     func `ordered list parser prefers leading references over incidental references`() {
         let text = """
         1. #2172 — schema text extensions

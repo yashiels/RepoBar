@@ -78,6 +78,9 @@ public enum GitHubReferenceTranslator {
         for query in lineScopedQueries {
             append(query)
         }
+        for query in self.contextualBareIssueQueries(in: text, minimumBareDigits: minimumBareDigits) {
+            append(self.applyingRepositoryContext(repositoryContext, to: query))
+        }
 
         let allowsNumericCommitHash = self.hasCommitContext(text)
         for token in tokens {
@@ -95,6 +98,116 @@ public enum GitHubReferenceTranslator {
         }
 
         return queries
+    }
+
+    private static func contextualBareIssueQueries(in text: String, minimumBareDigits: Int) -> [GitHubReferenceQuery] {
+        var previousHadReferenceContext = false
+        var queries: [GitHubReferenceQuery] = []
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
+            if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                previousHadReferenceContext = false
+                continue
+            }
+
+            for sentence in self.sentenceFragments(in: line) {
+                let hasContext = self.hasIssueReferenceContext(sentence)
+                defer { previousHadReferenceContext = hasContext }
+
+                if hasContext {
+                    queries.append(contentsOf: self.contextualBareIssueSeriesQueries(
+                        in: sentence,
+                        minimumBareDigits: minimumBareDigits
+                    ))
+                }
+
+                if previousHadReferenceContext, self.startsWithBackReference(sentence) {
+                    queries.append(contentsOf: self.backReferenceBareIssueSeriesQueries(
+                        in: sentence,
+                        minimumBareDigits: minimumBareDigits
+                    ))
+                }
+            }
+        }
+
+        return queries
+    }
+
+    private static func contextualBareIssueSeriesQueries(in sentence: String, minimumBareDigits: Int) -> [GitHubReferenceQuery] {
+        let tokens = self.referenceTokens(in: sentence)
+        guard tokens.isEmpty == false else { return [] }
+
+        var queries: [GitHubReferenceQuery] = []
+        for index in tokens.indices {
+            let token = tokens[index].lowercased()
+            let nextToken = tokens.indices.contains(index + 1) ? tokens[index + 1].lowercased() : nil
+            let startIndex: Int? = if ["pr", "prs", "issue", "issues"].contains(token) {
+                index + 1
+            } else if token == "pull", nextToken == "request" || nextToken == "requests" {
+                index + 2
+            } else {
+                nil
+            }
+            guard let startIndex else { continue }
+
+            queries.append(contentsOf: self.bareIssueSeriesQueries(
+                in: Array(tokens.dropFirst(startIndex)),
+                minimumBareDigits: minimumBareDigits
+            ))
+        }
+
+        return queries
+    }
+
+    private static func backReferenceBareIssueSeriesQueries(in sentence: String, minimumBareDigits: Int) -> [GitHubReferenceQuery] {
+        let tokens = self.referenceTokens(in: sentence)
+        guard tokens.count >= 2 else { return [] }
+
+        let firstToken = tokens[0].lowercased()
+        guard ["that", "this", "it", "they", "these", "those"].contains(firstToken) else { return [] }
+
+        let firstSeriesIndex = ["is", "are", "was", "were"].contains(tokens[1].lowercased()) ? 2 : 1
+        guard tokens.indices.contains(firstSeriesIndex) else { return [] }
+
+        return self.bareIssueSeriesQueries(
+            in: Array(tokens.dropFirst(firstSeriesIndex)),
+            minimumBareDigits: minimumBareDigits
+        )
+    }
+
+    private static func bareIssueSeriesQueries(in tokens: [String], minimumBareDigits: Int) -> [GitHubReferenceQuery] {
+        var queries: [GitHubReferenceQuery] = []
+
+        for token in tokens {
+            let normalized = token.lowercased()
+            if let number = self.bareIssueSeriesNumber(from: token, minimumBareDigits: minimumBareDigits) {
+                queries.append(.issueNumber(number))
+                continue
+            }
+
+            if ["and", "or", "maybe"].contains(normalized) {
+                continue
+            }
+
+            break
+        }
+
+        return queries
+    }
+
+    private static func bareIssueSeriesNumber(from token: String, minimumBareDigits: Int) -> Int? {
+        if token.hasPrefix("#") {
+            return self.issueNumber(from: token, minimumBareDigits: minimumBareDigits, allowBareNumber: false)
+        }
+
+        guard token.allSatisfy(\.isNumber),
+              let number = self.issueNumber(
+                  from: token,
+                  minimumBareDigits: minimumBareDigits,
+                  allowBareNumber: true
+              )
+        else { return nil }
+
+        return number
     }
 
     private static func primaryListItemQueries(
@@ -454,6 +567,24 @@ public enum GitHubReferenceTranslator {
         return ["in", "repo", "repository", "from", "for", "on", "inside"].contains(previous)
     }
 
+    private static func hasIssueReferenceContext(_ text: String) -> Bool {
+        let normalized = text.lowercased()
+        let tokens = self.referenceTokens(in: normalized)
+        if tokens.contains(where: { ["pr", "prs", "issue", "issues"].contains($0) }) {
+            return true
+        }
+
+        return normalized.contains("pull request")
+            || normalized.contains("security fix")
+            || normalized.contains("fix/enhancement")
+    }
+
+    private static func startsWithBackReference(_ text: String) -> Bool {
+        guard let firstToken = self.referenceTokens(in: text).first?.lowercased() else { return false }
+
+        return ["that", "this", "it", "they", "these", "those"].contains(firstToken)
+    }
+
     private static func applyingRepositoryContext(_ repositoryFullName: String?, to query: GitHubReferenceQuery) -> GitHubReferenceQuery {
         guard let repositoryFullName else { return query }
 
@@ -485,6 +616,14 @@ public enum GitHubReferenceTranslator {
             .map(String.init)
             .map(self.normalizedToken)
             .filter { $0.isEmpty == false }
+    }
+
+    private static func sentenceFragments(in text: String) -> [String] {
+        text
+            .split { character in
+                character == "." || character == "!" || character == "?"
+            }
+            .map(String.init)
     }
 
     private static func hasCommitContext(_ text: String) -> Bool {

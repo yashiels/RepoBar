@@ -2,6 +2,7 @@
 
 ## 0.6.1 - Unreleased
 
+- Recognize copied prose like `PR 123, 456 and 789` as multiple GitHub references.
 - Resolve copied reference snippets with a single `owner/repo` list item so bare `PR #123` references open in that repository.
 - Stop showing a repository warning when GitHub's pull request REST endpoint returns 404 for an otherwise visible repository.
 - Fix RepoBar CLI help and repository parsing so nested `help` paths, aliases, pasted GitHub URLs, SSH remotes, whitespace, and `.git` suffixes resolve consistently.
