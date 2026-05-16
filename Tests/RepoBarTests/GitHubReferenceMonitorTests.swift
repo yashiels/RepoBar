@@ -266,6 +266,44 @@ struct GitHubReferenceMonitorTests {
     }
 
     @Test
+    func `bare pr references inherit selected repository list item context`() {
+        let text = """
+        1. openclaw/Peekaboo
+
+        - Do: PR #139, maybe #138 in same pass.
+        - Why: small, concrete stale-tool-schema prompt fix; tests added. #138 is a 1-line community docs add.
+        - Risk: low. Proof path: Swift/package tests around PeekabooAgentRuntime.
+        """
+        #expect(GitHubReferenceTranslator.queries(from: text) == [
+            .repositoryIssueNumber(repositoryFullName: "openclaw/Peekaboo", number: 139),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/Peekaboo", number: 138)
+        ])
+    }
+
+    @Test
+    func `bare references stay unscoped when selection has multiple repository list items`() {
+        let text = """
+        1. openclaw/Peekaboo
+        2. openclaw/gogcli
+
+        - Do: PR #139
+        """
+        #expect(GitHubReferenceTranslator.queries(from: text) == [.issueNumber(139)])
+    }
+
+    @Test
+    func `explicit repository context beats selected repository list item context`() {
+        let text = """
+        1. openclaw/Peekaboo
+
+        Found in openclaw/gogcli: #569
+        """
+        #expect(GitHubReferenceTranslator.queries(from: text) == [
+            .repositoryIssueNumber(repositoryFullName: "openclaw/gogcli", number: 569)
+        ])
+    }
+
+    @Test
     func `ordered list parser prefers leading references over incidental references`() {
         let text = """
         1. #2172 — schema text extensions

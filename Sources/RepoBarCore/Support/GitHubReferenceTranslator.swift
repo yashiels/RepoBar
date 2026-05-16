@@ -34,7 +34,9 @@ public enum GitHubReferenceTranslator {
         guard text.count <= Self.maxScannedTextLength else { return [] }
 
         let tokens = self.referenceTokens(in: text)
-        let repositoryContext = repositoryContextOverride ?? self.repositoryContext(in: tokens)
+        let repositoryContext = repositoryContextOverride
+            ?? self.repositoryContext(in: tokens)
+            ?? self.listItemRepositoryContext(in: text)
         if tokens.contains(where: { self.urlQuery(from: $0) != nil }) {
             let primaryListQueries = self.primaryListItemQueries(
                 in: text,
@@ -417,6 +419,31 @@ public enum GitHubReferenceTranslator {
         }
 
         return repositoryFullNames.count == 1 ? repositoryFullNames[0] : nil
+    }
+
+    private static func listItemRepositoryContext(in text: String) -> String? {
+        let repositories = text
+            .split(whereSeparator: \.isNewline)
+            .compactMap { self.listItemBody(in: String($0)) }
+            .compactMap { body -> String? in
+                let tokens = self.referenceTokens(in: body)
+                guard tokens.count == 1,
+                      let repositoryFullName = tokens.first,
+                      self.isRepositoryFullName(repositoryFullName)
+                else { return nil }
+
+                return repositoryFullName
+            }
+
+        var uniqueRepositories: [String] = []
+        var seen: Set<String> = []
+        for repository in repositories {
+            guard seen.insert(repository.lowercased()).inserted else { continue }
+
+            uniqueRepositories.append(repository)
+        }
+
+        return uniqueRepositories.count == 1 ? uniqueRepositories[0] : nil
     }
 
     private static func isLikelyRepositoryContextToken(at index: Int, in tokens: [String]) -> Bool {
