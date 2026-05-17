@@ -147,6 +147,14 @@ final class GitHubReferenceBrowserMenuItemView: NSView {
         webView.load(URLRequest(url: self.url))
     }
 
+    func preload() {
+        self.loadIfNeeded()
+    }
+
+    func unload() {
+        self.tearDownWebView()
+    }
+
     private func ensureWebView() -> WKWebView? {
         if let webView {
             return webView

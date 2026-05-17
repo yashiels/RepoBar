@@ -72,8 +72,8 @@ private final class PasteboardTextPoller: @unchecked Sendable {
     private let onText: @Sendable (String) -> Void
     private var timer: DispatchSourceTimer?
     private var lastChangeCount: Int
-    private let pollInterval: DispatchTimeInterval = .seconds(5)
-    private let pollLeeway: DispatchTimeInterval = .seconds(1)
+    private let pollInterval: DispatchTimeInterval = .seconds(1)
+    private let pollLeeway: DispatchTimeInterval = .milliseconds(250)
     private let graceDelay: DispatchTimeInterval = .milliseconds(100)
 
     init(pasteboard: NSPasteboard, onText: @escaping @Sendable (String) -> Void) {

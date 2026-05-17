@@ -76,7 +76,7 @@ struct IssueNavigatorView: View {
             self.browserStore.clear()
         }
         .onReceive(
-            Timer.publish(every: 2, tolerance: 0.5, on: .main, in: .common).autoconnect()
+            Timer.publish(every: 1, tolerance: 0.25, on: .main, in: .common).autoconnect()
         ) { _ in
             self.updateClipboard(seedIfEmpty: false)
         }

@@ -399,6 +399,7 @@ final class StatusBarMenuManager: NSObject, NSMenuDelegate {
 
         self.logMenuEvent("menuWillOpen gitHubReferenceMenu items=\(menu.items.count)")
         self.refreshGitHubReferenceMenuIfNeeded(menu)
+        self.preloadGitHubReferenceMenuPreviews(menu)
         return true
     }
 
@@ -490,7 +491,9 @@ final class StatusBarMenuManager: NSObject, NSMenuDelegate {
     }
 
     func menuDidClose(_ menu: NSMenu) {
-        if menu === self.mainMenu {
+        if menu === self.gitHubReferenceMenu {
+            self.unloadGitHubReferenceMenuPreviews(menu)
+        } else if menu === self.mainMenu {
             let shouldReopen = self.pendingMenuReopen
             self.pendingMenuReopen = false
             self.menuBuilder.clearHighlights(in: menu)
