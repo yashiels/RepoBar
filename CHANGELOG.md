@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.6.2 - Unreleased
+
 ## 0.6.1 - 2026-05-17
 
 - Recognize copied prose like `PR 123, 456 and 789` as multiple GitHub references.
