@@ -224,10 +224,15 @@
 
         private func findGitRepos(in root: URL, maxDepth: Int, fileManager: FileManager) -> [URL] {
             var results: [URL] = []
+            var visitedRealPaths: Set<String> = []
 
             func scan(_ url: URL, depth: Int) {
-                if self.isGitRepo(url, fileManager: fileManager) {
-                    results.append(url)
+                let fileURL = (url as NSURL).filePathURL ?? url
+                let realURL = fileURL.resolvingSymlinksInPath().standardizedFileURL
+                guard visitedRealPaths.insert(realURL.path).inserted else { return }
+
+                if self.isGitRepo(fileURL, fileManager: fileManager) {
+                    results.append(fileURL)
                     return
                 }
 
@@ -249,8 +254,14 @@
                     if name.hasPrefix(".") { continue }
 
                     let values = try? child.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
-                    if values?.isSymbolicLink == true { continue }
-                    guard values?.isDirectory == true else { continue }
+                    if values?.isSymbolicLink == true {
+                        var isDirectory: ObjCBool = false
+                        guard fileManager.fileExists(atPath: child.path, isDirectory: &isDirectory),
+                              isDirectory.boolValue
+                        else { continue }
+                    } else {
+                        guard values?.isDirectory == true else { continue }
+                    }
 
                     scan(child, depth: depth + 1)
                 }
@@ -270,36 +281,26 @@
         let timeout: TimeInterval = LocalProjectsConstants.gitCommandTimeout
 
         func run(_ arguments: [String], in directory: URL) throws -> String {
-            let process = Process()
-            process.executableURL = GitExecutableLocator.shared.url
-            process.arguments = arguments
-            process.currentDirectoryURL = directory
-            process.environment = self.environment()
+            let result: GitProcessOutput
+            do {
+                result = try GitProcessRunner.run(
+                    arguments,
+                    in: directory,
+                    environment: self.environment(),
+                    timeout: self.timeout
+                )
+            } catch let error as GitProcessRunnerError {
+                guard case .timedOut = error else { throw error }
 
-            let outputPipe = Pipe()
-            let errorPipe = Pipe()
-            process.standardOutput = outputPipe
-            process.standardError = errorPipe
-
-            let didExit = DispatchSemaphore(value: 0)
-            process.terminationHandler = { _ in
-                didExit.signal()
-            }
-
-            try process.run()
-            let timeoutResult = didExit.wait(timeout: .now() + self.timeout)
-            if timeoutResult == .timedOut {
-                process.terminate()
-                _ = didExit.wait(timeout: .now() + 1)
                 throw GitRunnerError.timedOut(arguments: arguments, timeout: self.timeout)
+            } catch {
+                throw error
             }
 
-            let output = String(data: outputPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            if process.terminationStatus != 0 {
-                let error = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-                throw GitRunnerError.commandFailed(output: output, error: error)
+            if result.terminationStatus != 0 {
+                throw GitRunnerError.commandFailed(output: result.stdout, error: result.stderr)
             }
-            return output
+            return result.stdout
         }
 
         private func environment() -> [String: String] {

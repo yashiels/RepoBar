@@ -4,6 +4,7 @@
 
 - Recognize copied prose like `PR 123, 456 and 789` as multiple GitHub references.
 - Clean up failed OAuth login listeners and encode OAuth token requests correctly when credentials or refresh tokens contain reserved characters.
+- Discover symlinked local project repositories and keep git command output draining while RepoBar waits for local status.
 - Resolve copied reference snippets with a single `owner/repo` list item so bare `PR #123` references open in that repository.
 - Stop showing a repository warning when GitHub's pull request REST endpoint returns 404 for an otherwise visible repository.
 - Fix RepoBar CLI help and repository parsing so nested `help` paths, aliases, pasted GitHub URLs, SSH remotes, whitespace, and `.git` suffixes resolve consistently.

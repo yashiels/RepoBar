@@ -118,6 +118,29 @@ struct LocalProjectsServiceTests {
     }
 
     @Test
+    func `discover repo roots follows symlinked directories once`() throws {
+        let root = try makeTempDirectory()
+        let outside = try makeTempDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            try? FileManager.default.removeItem(at: outside)
+        }
+
+        let targetRepo = outside.appendingPathComponent("target-repo", isDirectory: true)
+        try FileManager.default.createDirectory(at: targetRepo, withIntermediateDirectories: true)
+        try initializeRepo(at: targetRepo, origin: "git@github.com:foo/target-repo.git")
+
+        let linkedRepo = root.appendingPathComponent("linked-repo", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: linkedRepo, withDestinationURL: targetRepo)
+        let loop = root.appendingPathComponent("loop", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: loop, withDestinationURL: root)
+
+        let roots = LocalProjectsService().discoverRepoRoots(rootURL: root, maxDepth: 2)
+
+        #expect(roots.map(\.lastPathComponent) == ["linked-repo"])
+    }
+
+    @Test
     func `snapshot auto sync fast forward pulls behind repos`() async throws {
         let base = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: base) }

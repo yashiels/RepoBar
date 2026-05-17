@@ -55,28 +55,21 @@
         }
 
         static func version(at url: URL) -> (version: String?, error: String?) {
-            let process = Process()
-            process.executableURL = url
-            process.arguments = ["--version"]
-            process.currentDirectoryURL = FileManager.default.temporaryDirectory
-            let out = Pipe()
-            let err = Pipe()
-            process.standardOutput = out
-            process.standardError = err
             do {
-                try process.run()
+                let output = try GitProcessRunner.run(
+                    executableURL: url,
+                    arguments: ["--version"],
+                    in: FileManager.default.temporaryDirectory
+                )
+                let trimmed = output.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+                if output.terminationStatus != 0 {
+                    let message = output.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+                    return (nil, message.isEmpty ? "git --version failed" : message)
+                }
+                return (trimmed.isEmpty ? nil : trimmed, nil)
             } catch {
                 return (nil, error.localizedDescription)
             }
-            process.waitUntilExit()
-            let stdout = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            let stderr = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            let trimmed = stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-            if process.terminationStatus != 0 {
-                let message = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
-                return (nil, message.isEmpty ? "git --version failed" : message)
-            }
-            return (trimmed.isEmpty ? nil : trimmed, nil)
         }
     }
 #endif
