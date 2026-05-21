@@ -16,6 +16,7 @@ read_when:
 2) **Run the full release script**
    - `Scripts/release.sh`
    - Builds, signs, notarizes, generates appcast entry + HTML notes from `CHANGELOG.md`, publishes GitHub release, tags/pushes.
+   - Shared release helper is resolved by `Scripts/mac-release`; set `MAC_RELEASE_TOOL` or keep `agent-scripts` next to this repo.
 
 3) **Sparkle UX verification**
    - About → “Check for Updates…”
