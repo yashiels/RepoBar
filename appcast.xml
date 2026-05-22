@@ -3,6 +3,21 @@
     <channel>
         <title>RepoBar</title>
         <item>
+            <title>0.6.4</title>
+            <pubDate>Fri, 22 May 2026 19:37:32 +0100</pubDate>
+            <link>https://raw.githubusercontent.com/steipete/RepoBar/main/appcast.xml</link>
+            <sparkle:version>17</sparkle:version>
+            <sparkle:shortVersionString>0.6.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>10.13</sparkle:minimumSystemVersion>
+            <description><![CDATA[<h2>RepoBar 0.6.4</h2>
+<ul>
+<li>Read the GitHub reference watcher clipboard contents on the main thread to avoid an AppKit pasteboard crash on macOS 26.5.</li>
+</ul>
+<p><a href="https://github.com/steipete/RepoBar/blob/main/CHANGELOG.md">View full changelog</a></p>
+]]></description>
+            <enclosure url="https://github.com/steipete/RepoBar/releases/download/v0.6.4/RepoBar-0.6.4.zip" length="24726656" type="application/octet-stream" sparkle:edSignature="mm82gMc6xJZClRK3Nk2EDxL0WoXo+cW14Mlq4amEQCiAdvb8tkysL0fO83QfKLj1xe2Kcv0ZGaB1Q5629S4IAA=="/>
+        </item>
+        <item>
             <title>0.6.3</title>
             <pubDate>Fri, 22 May 2026 07:46:23 +0100</pubDate>
             <link>https://raw.githubusercontent.com/steipete/RepoBar/main/appcast.xml</link>
@@ -32,17 +47,6 @@
 <p><a href="https://github.com/steipete/RepoBar/blob/main/CHANGELOG.md">View full changelog</a></p>
 ]]></description>
             <enclosure url="https://github.com/steipete/RepoBar/releases/download/v0.6.2/RepoBar-0.6.2.zip" length="24706222" type="application/octet-stream" sparkle:edSignature="jHJC/Jk8QMad5WiGBxKRmSS9OQWE5w8M4ehb3KsQ44ZbbKzNtmLpkbD5133Bf8ZjEUfY7/cDslRxnrO0wHBsAA=="/>
-        </item>
-        <item>
-            <title>0.6.1</title>
-            <pubDate>Sun, 17 May 2026 08:17:24 +0100</pubDate>
-            <link>https://raw.githubusercontent.com/steipete/RepoBar/main/appcast.xml</link>
-            <sparkle:version>14</sparkle:version>
-            <sparkle:shortVersionString>0.6.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>10.13</sparkle:minimumSystemVersion>
-            <description><![CDATA[<ul><li>Recognize copied prose like `PR 123, 456 and 789` as multiple GitHub references.</li><li>Clean up failed OAuth login listeners and encode OAuth token requests correctly when credentials or refresh tokens contain reserved characters.</li><li>Discover symlinked local project repositories and keep git command output draining while RepoBar waits for local status.</li><li>Bound GitHub lookup fan-out and redact diagnostic query values for REST requests.</li><li>Resolve copied reference snippets with a single `owner/repo` list item so bare `PR #123` references open in that repository.</li><li>Stop showing a repository warning when GitHub&#x27;s pull request REST endpoint returns 404 for an otherwise visible repository.</li><li>Fix RepoBar CLI help and repository parsing so nested `help` paths, aliases, pasted GitHub URLs, SSH remotes, whitespace, and `.git` suffixes resolve consistently.</li></ul>
-]]></description>
-            <enclosure url="https://github.com/steipete/RepoBar/releases/download/v0.6.1/RepoBar-0.6.1.zip" length="24631404" type="application/octet-stream" sparkle:edSignature="99QmwVdqHyOZ0jSwIleAx7e7qejPUAm1VDrWWHmtgI7+vAQbJhEGmQ6fNsszXjYx2YULp4Ee3q29GgDrXTnADA=="/>
         </item>
     </channel>
 </rss>
