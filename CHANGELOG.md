@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.6.5 - Unreleased
+
 ## 0.6.4 - 2026-05-22
 
 - Read the GitHub reference watcher clipboard contents on the main thread to avoid an AppKit pasteboard crash on macOS 26.5.
