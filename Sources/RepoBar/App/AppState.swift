@@ -163,7 +163,12 @@ final class AppState {
         let scopedQueries = await self.queries(queries, applyingLocalRepositoryContextFrom: sourceText)
         guard self.gitHubReferenceResolutionID == resolutionID else { return }
 
-        let matches = await self.referenceMatches(for: scopedQueries, resolutionID: resolutionID) { matches in
+        let provisionalMatches = self.provisionalReferenceMatches(from: sourceText)
+        let matches = await self.referenceMatches(
+            for: scopedQueries,
+            resolutionID: resolutionID,
+            provisionalMatches: provisionalMatches
+        ) { matches in
             self.setGitHubReferenceMatches(matches)
         }
         guard self.gitHubReferenceResolutionID == resolutionID else { return }
@@ -487,15 +492,24 @@ final class AppState {
     private func referenceMatches(
         for queries: [GitHubReferenceQuery],
         resolutionID: UUID?,
+        provisionalMatches: [GitHubReferenceQuery: GitHubReferenceMatch] = [:],
         onProgress: (([GitHubReferenceMatch]) -> Void)? = nil
     ) async -> [GitHubReferenceMatch] {
         let limitedQueries = Array(queries.prefix(AppLimits.GitHubReferenceMonitor.queryLimit))
         let repositories = self.githubReferenceCandidateRepositories()
         let github = self.github
         var matchesByIndex: [Int: GitHubReferenceMatch] = [:]
-        var seen: Set<URL> = []
 
         let indexedQueries = Array(limitedQueries.enumerated())
+        for (index, query) in indexedQueries {
+            if let provisionalMatch = provisionalMatches[query] {
+                matchesByIndex[index] = provisionalMatch
+            }
+        }
+        if matchesByIndex.isEmpty == false {
+            onProgress?(Self.orderedReferenceMatches(matchesByIndex))
+        }
+
         for chunk in indexedQueries.chunks(ofCount: AppLimits.GitHubReferenceMonitor.resolutionConcurrencyLimit) {
             await withTaskGroup(of: (Int, GitHubReferenceMatch?).self) { group in
                 for (index, query) in chunk {
@@ -514,11 +528,14 @@ final class AppState {
                         group.cancelAll()
                         return
                     }
-                    guard let match, seen.insert(match.url).inserted else { continue }
-
-                    matchesByIndex[index] = match
-                    let orderedMatches = matchesByIndex.keys.sorted().compactMap { matchesByIndex[$0] }
-                    onProgress?(orderedMatches)
+                    if let match {
+                        matchesByIndex[index] = match
+                    } else if let provisionalMatch = matchesByIndex[index], provisionalMatch.isResolved == false {
+                        matchesByIndex[index] = GitHubReferenceMatch.unresolved(from: provisionalMatch)
+                    } else {
+                        continue
+                    }
+                    onProgress?(Self.orderedReferenceMatches(matchesByIndex))
                 }
             }
 
@@ -527,7 +544,30 @@ final class AppState {
             }
         }
 
-        return matchesByIndex.keys.sorted().compactMap { matchesByIndex[$0] }
+        return Self.orderedReferenceMatches(matchesByIndex)
+    }
+
+    private nonisolated static func orderedReferenceMatches(_ matchesByIndex: [Int: GitHubReferenceMatch]) -> [GitHubReferenceMatch] {
+        var seen: Set<URL> = []
+        return matchesByIndex.keys.sorted().compactMap { matchesByIndex[$0] }.filter {
+            seen.insert($0.url).inserted
+        }
+    }
+
+    private nonisolated func provisionalReferenceMatches(from sourceText: String) -> [GitHubReferenceQuery: GitHubReferenceMatch] {
+        let now = Date()
+        var matches: [GitHubReferenceQuery: GitHubReferenceMatch] = [:]
+        for reference in GitHubReferenceTranslator.urlReferences(in: sourceText) {
+            guard let match = GitHubReferenceMatch.provisional(
+                query: reference.query,
+                url: reference.url,
+                kind: reference.kind,
+                now: now
+            ) else { continue }
+
+            matches[reference.query] = match
+        }
+        return matches
     }
 
     private func queries(

@@ -1,5 +1,11 @@
 import Foundation
 
+public struct GitHubReferenceParsedURL: Sendable, Hashable {
+    public let query: GitHubReferenceQuery
+    public let url: URL
+    public let kind: GitHubReferenceKind
+}
+
 public enum GitHubReferenceTranslator {
     public static let defaultMinimumBareDigits = 1
     private static let maxScannedTextLength = 8000
@@ -368,10 +374,36 @@ public enum GitHubReferenceTranslator {
     }
 
     private static func urlQuery(from rawText: String) -> GitHubReferenceQuery? {
+        self.urlReference(from: rawText)?.query
+    }
+}
+
+public extension GitHubReferenceTranslator {
+    static func urlReferences(in rawText: String) -> [GitHubReferenceParsedURL] {
+        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let reference = self.urlReference(from: text) {
+            return [reference]
+        }
+        guard text.count <= Self.maxScannedTextLength else { return [] }
+
+        var references: [GitHubReferenceParsedURL] = []
+        var seen: Set<String> = []
+        for token in self.referenceTokens(in: text) {
+            guard let reference = self.urlReference(from: token),
+                  seen.insert(self.dedupeKey(for: reference.query)).inserted
+            else { continue }
+
+            references.append(reference)
+        }
+        return references
+    }
+
+    private static func urlReference(from rawText: String) -> GitHubReferenceParsedURL? {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: text),
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              components.scheme?.lowercased().hasPrefix("http") == true
+              let scheme = components.scheme?.lowercased(),
+              scheme == "http" || scheme == "https"
         else { return nil }
 
         let host = components.host?.lowercased() ?? ""
@@ -387,33 +419,59 @@ public enum GitHubReferenceTranslator {
         case "issues":
             guard let number = Int(pathParts[3]) else { return nil }
 
-            return .repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number)
+            return GitHubReferenceParsedURL(
+                query: .repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number),
+                url: url,
+                kind: .issue
+            )
         case "pull":
             if let hash = self.commitHash(in: pathParts.dropFirst(4)) {
-                return .repositoryCommitHash(repositoryFullName: repositoryFullName, hash: hash)
+                return GitHubReferenceParsedURL(
+                    query: .repositoryCommitHash(repositoryFullName: repositoryFullName, hash: hash),
+                    url: url,
+                    kind: .commit
+                )
             }
             guard let number = Int(pathParts[3]) else { return nil }
 
-            return .repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number)
+            return GitHubReferenceParsedURL(
+                query: .repositoryIssueNumber(repositoryFullName: repositoryFullName, number: number),
+                url: url,
+                kind: .pullRequest
+            )
         case "commit", "commits":
             let hash = pathParts[3].lowercased()
             guard self.isCommitHash(hash, allowNumericOnly: true) else { return nil }
 
-            return .repositoryCommitHash(repositoryFullName: repositoryFullName, hash: hash)
+            return GitHubReferenceParsedURL(
+                query: .repositoryCommitHash(repositoryFullName: repositoryFullName, hash: hash),
+                url: url,
+                kind: .commit
+            )
         case "actions":
             guard pathParts.count >= 5,
                   pathParts[3].lowercased() == "runs",
                   let runID = Int64(pathParts[4])
             else { return nil }
 
-            return .repositoryWorkflowRun(repositoryFullName: repositoryFullName, runID: runID)
+            return GitHubReferenceParsedURL(
+                query: .repositoryWorkflowRun(repositoryFullName: repositoryFullName, runID: runID),
+                url: url,
+                kind: .workflowRun
+            )
         default:
             guard let hash = self.commitHash(in: pathParts.dropFirst(2)) else { return nil }
 
-            return .repositoryCommitHash(repositoryFullName: repositoryFullName, hash: hash)
+            return GitHubReferenceParsedURL(
+                query: .repositoryCommitHash(repositoryFullName: repositoryFullName, hash: hash),
+                url: url,
+                kind: .commit
+            )
         }
     }
+}
 
+private extension GitHubReferenceTranslator {
     private static func commitHash(in pathParts: some Sequence<String>) -> String? {
         pathParts
             .map { $0.lowercased() }

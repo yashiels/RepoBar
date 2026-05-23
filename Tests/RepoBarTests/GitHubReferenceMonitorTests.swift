@@ -130,6 +130,44 @@ struct GitHubReferenceMonitorTests {
             GitHubReferenceTranslator.query(from: "https://github.com/openclaw/openclaw/pull/1234567") ==
                 .repositoryIssueNumber(repositoryFullName: "openclaw/openclaw", number: 1_234_567)
         )
+        #expect(GitHubReferenceTranslator.query(from: "httpx://github.com/openclaw/openclaw/issues/1") == nil)
+    }
+
+    @Test
+    func `github url references preserve source url and kind for provisional previews`() throws {
+        let references = GitHubReferenceTranslator.urlReferences(in: """
+          - https://github.com/openclaw/openclaw/pull/85652
+            Fixes gateway prompt history.
+          - https://github.com/openclaw/openclaw/pull/85777
+            Fixes WhatsApp auto-reply failure logging.
+          - https://github.com/openclaw/openclaw/issues/85796
+            Tracks Twitch cleanup.
+        """)
+
+        #expect(references.map(\.query) == [
+            .repositoryIssueNumber(repositoryFullName: "openclaw/openclaw", number: 85652),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/openclaw", number: 85777),
+            .repositoryIssueNumber(repositoryFullName: "openclaw/openclaw", number: 85796)
+        ])
+        #expect(references.map(\.kind) == [.pullRequest, .pullRequest, .issue])
+        #expect(references.first?.url.absoluteString == "https://github.com/openclaw/openclaw/pull/85652")
+
+        let provisional = try #require(GitHubReferenceMatch.provisional(
+            query: references[0].query,
+            url: references[0].url,
+            kind: references[0].kind,
+            now: Date(timeIntervalSince1970: 0)
+        ))
+        #expect(provisional.url.absoluteString == "https://github.com/openclaw/openclaw/pull/85652")
+        #expect(provisional.kind == .pullRequest)
+        #expect(provisional.repositoryFullName == "openclaw/openclaw")
+        #expect(provisional.isResolved == false)
+
+        let unresolved = GitHubReferenceMatch.unresolved(from: provisional, now: Date(timeIntervalSince1970: 1))
+        #expect(unresolved.url == provisional.url)
+        #expect(unresolved.kind == .pullRequest)
+        #expect(unresolved.title == "GitHub preview unavailable")
+        #expect(unresolved.isResolved == false)
     }
 
     @Test

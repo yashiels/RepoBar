@@ -96,6 +96,7 @@ public struct GitHubReferenceMatch: Sendable, Hashable {
     public let updatedAt: Date
     public let bodyPreview: String?
     public let authorLogin: String?
+    public let isResolved: Bool
 
     public init(
         query: GitHubReferenceQuery,
@@ -107,7 +108,8 @@ public struct GitHubReferenceMatch: Sendable, Hashable {
         createdAt: Date?,
         updatedAt: Date,
         bodyPreview: String? = nil,
-        authorLogin: String? = nil
+        authorLogin: String? = nil,
+        isResolved: Bool = true
     ) {
         self.query = query
         self.title = title
@@ -119,6 +121,44 @@ public struct GitHubReferenceMatch: Sendable, Hashable {
         self.updatedAt = updatedAt
         self.bodyPreview = bodyPreview
         self.authorLogin = authorLogin
+        self.isResolved = isResolved
+    }
+
+    public static func provisional(
+        query: GitHubReferenceQuery,
+        url: URL,
+        kind: GitHubReferenceKind,
+        now: Date = Date()
+    ) -> GitHubReferenceMatch? {
+        guard let repositoryFullName = query.repositoryFullName else { return nil }
+
+        return GitHubReferenceMatch(
+            query: query,
+            title: "Loading GitHub preview...",
+            url: url,
+            repositoryFullName: repositoryFullName,
+            kind: kind,
+            state: nil,
+            createdAt: nil,
+            updatedAt: now,
+            isResolved: false
+        )
+    }
+
+    public static func unresolved(from match: GitHubReferenceMatch, now: Date = Date()) -> GitHubReferenceMatch {
+        GitHubReferenceMatch(
+            query: match.query,
+            title: "GitHub preview unavailable",
+            url: match.url,
+            repositoryFullName: match.repositoryFullName,
+            kind: match.kind,
+            state: nil,
+            createdAt: match.createdAt,
+            updatedAt: now,
+            bodyPreview: match.bodyPreview,
+            authorLogin: match.authorLogin,
+            isResolved: false
+        )
     }
 
     public static func newestCreated(in matches: [GitHubReferenceMatch]) -> GitHubReferenceMatch? {
