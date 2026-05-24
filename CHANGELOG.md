@@ -6,6 +6,7 @@
 - Keep REST core rate-limit diagnostics focused on the shared quota instead of filling Current Blocker with per-request cooldown rows.
 - Keep copied triage lists with leading bare GitHub references from inheriting incidental repository paths mentioned later in item descriptions.
 - Show copied GitHub URL previews immediately with loading placeholders, then update each entry as GitHub metadata resolves.
+- Recognize copied repo-heading triage blocks like `owner/repo: 1 issue / 1 PR` followed by indented `#123` references.
 
 ## 0.6.4 - 2026-05-22
 

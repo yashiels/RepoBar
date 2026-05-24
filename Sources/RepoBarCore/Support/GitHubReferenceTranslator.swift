@@ -37,20 +37,56 @@ public enum GitHubReferenceTranslator {
             return [self.applyingRepositoryContext(repositoryContextOverride, to: query)]
         }
 
-        guard text.count <= Self.maxScannedTextLength else { return [] }
+        let scannedText = rawText.trimmingCharacters(in: .newlines)
+        guard scannedText.count <= Self.maxScannedTextLength else { return [] }
 
-        let tokens = self.referenceTokens(in: text)
-        let repositoryContext = repositoryContextOverride
-            ?? self.repositoryContext(in: text)
-            ?? self.listItemRepositoryContext(in: text)
+        let repositoryHeadingListBlockParse = self.repositoryHeadingListBlockParse(
+            in: scannedText,
+            minimumBareDigits: minimumBareDigits
+        )
+        if repositoryHeadingListBlockParse.entries.isEmpty == false {
+            return self.queriesMergingRepositoryHeadingListBlocks(
+                in: scannedText,
+                minimumBareDigits: minimumBareDigits,
+                repositoryContextOverride: repositoryContextOverride,
+                repositoryHeadingListBlockParse: repositoryHeadingListBlockParse
+            )
+        }
+
+        return self.normalQueries(
+            from: repositoryHeadingListBlockParse.remainingText,
+            minimumBareDigits: minimumBareDigits,
+            repositoryContextOverride: repositoryContextOverride
+        )
+    }
+
+    static func normalQueries(
+        from parseText: String,
+        minimumBareDigits: Int,
+        repositoryContextOverride: String?
+    ) -> [GitHubReferenceQuery] {
+        let tokens = self.referenceTokens(in: parseText)
+        let repositoryContext = self.inferredRepositoryContext(
+            in: parseText,
+            repositoryContextOverride: repositoryContextOverride
+        )
         let primaryListQueries = self.primaryListItemQueries(
-            in: text,
+            in: parseText,
             repositoryContext: repositoryContext
         )
-        if tokens.contains(where: { self.urlQuery(from: $0) != nil }) {
-            if primaryListQueries.count >= 2 {
-                return primaryListQueries
+        let groupedQueries = self.groupedRepositoryIssueQueries(in: parseText)
+        let lineScopedQueries = self.lineScopedRepositoryIssueQueries(in: parseText)
+        let scopedIssueNumbers = Set((groupedQueries + lineScopedQueries).compactMap { query in
+            if case let .repositoryIssueNumber(_, number) = query {
+                return number
             }
+            return nil
+        })
+        if let shortcutQueries = self.primaryURLShortcutQueries(
+            tokens: tokens,
+            primaryListQueries: primaryListQueries
+        ) {
+            return shortcutQueries
         }
 
         var queries: [GitHubReferenceQuery] = []
@@ -76,25 +112,17 @@ public enum GitHubReferenceTranslator {
             }
         }
 
-        let groupedQueries = self.groupedRepositoryIssueQueries(in: text)
-        let lineScopedQueries = self.lineScopedRepositoryIssueQueries(in: text)
-        let scopedIssueNumbers = Set((groupedQueries + lineScopedQueries).compactMap { query in
-            if case let .repositoryIssueNumber(_, number) = query {
-                return number
-            }
-            return nil
-        })
         for query in groupedQueries {
             append(query)
         }
         for query in lineScopedQueries {
             append(query)
         }
-        for query in self.contextualBareIssueQueries(in: text, minimumBareDigits: minimumBareDigits) {
+        for query in self.contextualBareIssueQueries(in: parseText, minimumBareDigits: minimumBareDigits) {
             append(self.applyingRepositoryContext(repositoryContext, to: query))
         }
 
-        let allowsNumericCommitHash = self.hasCommitContext(text)
+        let allowsNumericCommitHash = self.hasCommitContext(parseText)
         for token in tokens {
             if let query = self.tokenQuery(
                 from: token,
@@ -112,7 +140,16 @@ public enum GitHubReferenceTranslator {
         return queries
     }
 
-    private static func contextualBareIssueQueries(in text: String, minimumBareDigits: Int) -> [GitHubReferenceQuery] {
+    static func inferredRepositoryContext(
+        in parseText: String,
+        repositoryContextOverride: String?
+    ) -> String? {
+        repositoryContextOverride
+            ?? self.repositoryContext(in: parseText)
+            ?? self.listItemRepositoryContext(in: parseText)
+    }
+
+    static func contextualBareIssueQueries(in text: String, minimumBareDigits: Int) -> [GitHubReferenceQuery] {
         var previousHadReferenceContext = false
         var queries: [GitHubReferenceQuery] = []
         for line in text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
@@ -175,7 +212,7 @@ public enum GitHubReferenceTranslator {
         return queries
     }
 
-    private static func backReferenceBareIssueSeriesQueries(in sentence: String, minimumBareDigits: Int) -> [GitHubReferenceQuery] {
+    static func backReferenceBareIssueSeriesQueries(in sentence: String, minimumBareDigits: Int) -> [GitHubReferenceQuery] {
         let tokens = self.referenceTokens(in: sentence)
         guard tokens.count >= 2 else { return [] }
 
@@ -278,7 +315,38 @@ public enum GitHubReferenceTranslator {
         return queries
     }
 
-    private static func listItemBody(in line: String) -> String? {
+    private static func primaryURLShortcutQueries(
+        tokens: [String],
+        primaryListQueries: [GitHubReferenceQuery]
+    ) -> [GitHubReferenceQuery]? {
+        guard primaryListQueries.count >= 2,
+              tokens.contains(where: { self.urlQuery(from: $0) != nil })
+        else { return nil }
+
+        return primaryListQueries
+    }
+
+    static func primaryURLShortcutDedupeKeys(
+        in parseText: String,
+        repositoryContextOverride: String?
+    ) -> Set<String>? {
+        let tokens = self.referenceTokens(in: parseText)
+        let repositoryContext = repositoryContextOverride
+            ?? self.repositoryContext(in: parseText)
+            ?? self.listItemRepositoryContext(in: parseText)
+        let primaryListQueries = self.primaryListItemQueries(
+            in: parseText,
+            repositoryContext: repositoryContext
+        )
+        guard let shortcutQueries = self.primaryURLShortcutQueries(
+            tokens: tokens,
+            primaryListQueries: primaryListQueries
+        ) else { return nil }
+
+        return Set(shortcutQueries.map(self.dedupeKey(for:)))
+    }
+
+    static func listItemBody(in line: String) -> String? {
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else { return nil }
 
@@ -349,7 +417,7 @@ public enum GitHubReferenceTranslator {
         return queries
     }
 
-    private static func tokenQuery(
+    static func tokenQuery(
         from rawToken: String,
         minimumBareDigits: Int,
         allowBareIssueNumber: Bool,
@@ -373,7 +441,7 @@ public enum GitHubReferenceTranslator {
         return nil
     }
 
-    private static func urlQuery(from rawText: String) -> GitHubReferenceQuery? {
+    static func urlQuery(from rawText: String) -> GitHubReferenceQuery? {
         self.urlReference(from: rawText)?.query
     }
 }
@@ -471,14 +539,14 @@ public extension GitHubReferenceTranslator {
     }
 }
 
-private extension GitHubReferenceTranslator {
+extension GitHubReferenceTranslator {
     private static func commitHash(in pathParts: some Sequence<String>) -> String? {
         pathParts
             .map { $0.lowercased() }
             .first { self.isCommitHash($0, allowNumericOnly: true) }
     }
 
-    private static func issueNumber(from token: String, minimumBareDigits: Int, allowBareNumber: Bool) -> Int? {
+    static func issueNumber(from token: String, minimumBareDigits: Int, allowBareNumber: Bool) -> Int? {
         if token.hasPrefix("#") {
             return Int(token.dropFirst())
         }
@@ -513,7 +581,7 @@ private extension GitHubReferenceTranslator {
         return .repositoryNameIssueNumber(repositoryName: parts[0], number: number)
     }
 
-    private static func compoundRepositoryIssueQueries(from token: String) -> [GitHubReferenceQuery] {
+    static func compoundRepositoryIssueQueries(from token: String) -> [GitHubReferenceQuery] {
         let parts = token.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
         guard parts.count == 2,
               self.isRepositoryFullName(parts[0]),
@@ -558,7 +626,7 @@ private extension GitHubReferenceTranslator {
         return [number]
     }
 
-    private static func compoundBareIssueQueries(from token: String) -> [GitHubReferenceQuery] {
+    static func compoundBareIssueQueries(from token: String) -> [GitHubReferenceQuery] {
         guard token.hasPrefix("#"),
               token.contains("/") || token.contains("-")
         else { return [] }
@@ -589,7 +657,7 @@ private extension GitHubReferenceTranslator {
         return Int(normalized)
     }
 
-    private static func isRepositoryFullName(_ value: String) -> Bool {
+    static func isRepositoryFullName(_ value: String) -> Bool {
         let parts = value.split(separator: "/", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { return false }
 
@@ -695,7 +763,7 @@ private extension GitHubReferenceTranslator {
         return ["in", "repo", "repository", "from", "for", "on", "inside"].contains(previous)
     }
 
-    private static func hasIssueReferenceContext(_ text: String) -> Bool {
+    static func hasIssueReferenceContext(_ text: String) -> Bool {
         let normalized = text.lowercased()
         let tokens = self.referenceTokens(in: normalized)
         if tokens.contains(where: { ["pr", "prs", "issue", "issues"].contains($0) }) {
@@ -707,7 +775,7 @@ private extension GitHubReferenceTranslator {
             || normalized.contains("fix/enhancement")
     }
 
-    private static func isIssueCountSummary(_ text: String) -> Bool {
+    static func isIssueCountSummary(_ text: String) -> Bool {
         let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard normalized.contains(":") else { return false }
 
@@ -735,7 +803,7 @@ private extension GitHubReferenceTranslator {
         return ["that", "this", "it", "they", "these", "those"].contains(firstToken)
     }
 
-    private static func applyingRepositoryContext(_ repositoryFullName: String?, to query: GitHubReferenceQuery) -> GitHubReferenceQuery {
+    static func applyingRepositoryContext(_ repositoryFullName: String?, to query: GitHubReferenceQuery) -> GitHubReferenceQuery {
         guard let repositoryFullName else { return query }
 
         switch query {
@@ -760,7 +828,7 @@ private extension GitHubReferenceTranslator {
             .trimmingCharacters(in: CharacterSet(charactersIn: ".,;:()[]{}<>\"'`"))
     }
 
-    private static func referenceTokens(in text: String) -> [String] {
+    static func referenceTokens(in text: String) -> [String] {
         text
             .split(whereSeparator: \.isWhitespace)
             .map(String.init)
@@ -781,7 +849,7 @@ private extension GitHubReferenceTranslator {
         return normalized.contains("sha") || normalized.contains("commit") || normalized.contains("hash")
     }
 
-    private static func dedupeKey(for query: GitHubReferenceQuery) -> String {
+    static func dedupeKey(for query: GitHubReferenceQuery) -> String {
         switch query {
         case let .issueNumber(number):
             "issue:\(number)"
@@ -796,6 +864,11 @@ private extension GitHubReferenceTranslator {
         case let .repositoryWorkflowRun(repositoryFullName, runID):
             "repo:\(repositoryFullName.lowercased())/run/\(runID)"
         }
+    }
+
+    static func dedupedQueries(_ queries: [GitHubReferenceQuery]) -> [GitHubReferenceQuery] {
+        var seen: Set<String> = []
+        return queries.filter { seen.insert(self.dedupeKey(for: $0)).inserted }
     }
 
     private static func isCommitHash(_ token: String, allowNumericOnly: Bool) -> Bool {
