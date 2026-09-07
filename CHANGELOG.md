@@ -6,6 +6,7 @@
 
 - Honor `local-reset --yes`, `checkout --open`, and `repo --traffic`, `--heatmap`, and `--release`, which were silently ignored (thanks @devYRPauli). (#113)
 - Distinguish CI runs for the same commit by showing workflow names in the menu and CLI output (thanks @jiimaho). (#115)
+- Declare the macOS 15 minimum in the app bundle so Sparkle does not offer incompatible updates to older macOS versions.
 - Honor `repobar changelog --release` and count newer dated entries when the Unreleased section is empty (thanks @devYRPauli). (#109)
 - Rewrite the README around installation and first use, with dynamic project badges and tighter links to reference documentation.
 - Update AppAuth to 3.0.0 and refresh Apollo, Kingfisher, Sparkle, swift-log, Swiftdansi, GraphQL, Octokit, tsx, pnpm, and the Node.js setup action.

@@ -112,6 +112,7 @@ cat > "${INFO_PLIST}" <<PLIST
     <key>CFBundleIdentifier</key><string>${BUNDLE_IDENTIFIER}</string>
     <key>CFBundleExecutable</key><string>${APP_NAME}</string>
     <key>CFBundlePackageType</key><string>APPL</string>
+    <key>LSMinimumSystemVersion</key><string>15.0</string>
     <key>CFBundleShortVersionString</key><string>${MARKETING_VERSION}</string>
     <key>CFBundleVersion</key><string>${BUILD_NUMBER}</string>
     <key>SUFeedURL</key><string>https://raw.githubusercontent.com/steipete/RepoBar/main/appcast.xml</string>

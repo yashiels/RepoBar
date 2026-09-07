@@ -25,6 +25,7 @@ Keep `TMPDIR` set to a private, writable directory for release commands. Packagi
    - Menu only shows “Update ready, restart now?” once the update is downloaded.
    - Sparkle dialog shows formatted release notes (not escaped HTML).
    - Verify the released app does **not** include `RepoBarTokenStore=file`.
+   - Verify the packaged `LSMinimumSystemVersion` and generated appcast minimum are both `15.0`.
    - Verify `keychain-access-groups` is present only if the app is signed with a matching provisioning profile. Otherwise leave `REPOBAR_SKIP_KEYCHAIN_GROUPS` at the release default (`1`) to avoid AMFI launch failures.
 
 ## Manual steps (only when re-running pieces)
