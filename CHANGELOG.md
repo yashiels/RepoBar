@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.8.8 - 2026-09-06
 
 **Highlights:** CLI flags now behave as requested, and workflow names make CI runs for the same commit easy to distinguish.
