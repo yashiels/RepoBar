@@ -1,13 +1,14 @@
 # Changelog
 
-## 0.8.8 - Unreleased
+## 0.8.8 - 2026-09-06
 
-- Honor `repobar changelog --release` and count newer dated entries when the Unreleased section is empty (thanks @devYRPauli). (#109)
+**Highlights:** CLI flags now behave as requested, and workflow names make CI runs for the same commit easy to distinguish.
+
 - Honor `local-reset --yes`, `checkout --open`, and `repo --traffic`, `--heatmap`, and `--release`, which were silently ignored (thanks @devYRPauli). (#113)
+- Distinguish CI runs for the same commit by showing workflow names in the menu and CLI output (thanks @jiimaho). (#115)
+- Honor `repobar changelog --release` and count newer dated entries when the Unreleased section is empty (thanks @devYRPauli). (#109)
 - Rewrite the README around installation and first use, with dynamic project badges and tighter links to reference documentation.
 - Update AppAuth to 3.0.0 and refresh Apollo, Kingfisher, Sparkle, swift-log, Swiftdansi, GraphQL, Octokit, tsx, pnpm, and the Node.js setup action.
-
-- Distinguish CI runs for the same commit by showing workflow names in the menu and CLI output (thanks @jiimaho). (#115)
 
 ## 0.8.7 - 2026-08-02
 

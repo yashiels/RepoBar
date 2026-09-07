@@ -8,6 +8,8 @@ read_when:
 
 # Release checklist (RepoBar)
 
+Keep `TMPDIR` set to a private, writable directory for release commands. Packaging uses unique temporary paths for the notarization key, submission archive, and signing entitlements, and removes them when the command exits.
+
 ## ✅ Standard Release Flow (RepoBar/VibeTunnel parity)
 1) **Version + changelog**
    - Update `version.env` (`MARKETING_VERSION`, `BUILD_NUMBER`).

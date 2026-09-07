@@ -24,12 +24,14 @@ if [ -z "$IDENTITY" ]; then
   exit 0
 fi
 ENTITLEMENTS="$ROOT_DIR/RepoBar.entitlements"
-TMP_ENTITLEMENTS="/tmp/RepoBar_entitlements.plist"
 
 if [ ! -d "$APP_PATH" ]; then
   log "App bundle not found: $APP_PATH"
   exit 1
 fi
+
+TMP_ENTITLEMENTS=$(mktemp "${TMPDIR:-/tmp}/RepoBar-entitlements.XXXXXX")
+trap 'rm -f "$TMP_ENTITLEMENTS"' EXIT
 
 extract_team_id() {
   local identity="$1"
@@ -131,5 +133,4 @@ codesign --force --options runtime --timestamp --entitlements "$TMP_ENTITLEMENTS
 log "Verifying"
 codesign --verify --verbose=2 "$APP_PATH"
 
-rm -f "$TMP_ENTITLEMENTS"
 log "Done codesigning $APP_PATH"

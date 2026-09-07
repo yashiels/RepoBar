@@ -14,8 +14,11 @@ if [[ -z "${APP_STORE_CONNECT_API_KEY_P8:-}" || -z "${APP_STORE_CONNECT_KEY_ID:-
   exit 1
 fi
 api_key_p8=${APP_STORE_CONNECT_API_KEY_P8//\\n/$'\n'}
-printf "%s\n" "$api_key_p8" > /tmp/repobar-api-key.p8
-trap 'rm -f /tmp/repobar-api-key.p8 /tmp/RepoBarNotarize.zip' EXIT
+WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/repobar-notarize.XXXXXX")
+trap 'rm -rf "$WORK_DIR"' EXIT
+API_KEY_FILE="$WORK_DIR/api-key.p8"
+NOTARY_ZIP="$WORK_DIR/RepoBarNotarize.zip"
+(umask 077; printf "%s\n" "$api_key_p8" > "$API_KEY_FILE")
 
 swift build -c release --arch arm64 --arch x86_64
 SKIP_BUILD=1 ./Scripts/package_app.sh release
@@ -43,11 +46,11 @@ export REPOBAR_SKIP_KEYCHAIN_GROUPS="${REPOBAR_SKIP_KEYCHAIN_GROUPS:-1}"
 ./Scripts/codesign_app.sh "$APP_BUNDLE" "$APP_IDENTITY"
 
 DITTO_BIN=${DITTO_BIN:-/usr/bin/ditto}
-"$DITTO_BIN" -c -k --keepParent --sequesterRsrc "$APP_BUNDLE" /tmp/RepoBarNotarize.zip
+"$DITTO_BIN" -c -k --keepParent --sequesterRsrc "$APP_BUNDLE" "$NOTARY_ZIP"
 
 echo "Submitting for notarization"
-xcrun notarytool submit /tmp/RepoBarNotarize.zip \
-  --key /tmp/repobar-api-key.p8 \
+xcrun notarytool submit "$NOTARY_ZIP" \
+  --key "$API_KEY_FILE" \
   --key-id "$APP_STORE_CONNECT_KEY_ID" \
   --issuer "$APP_STORE_CONNECT_ISSUER_ID" \
   --no-s3-acceleration \
